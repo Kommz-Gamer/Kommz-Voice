@@ -76,12 +76,12 @@ SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "").strip()
 # Modal endpoints
 MODAL_WHISPER_URL = os.environ.get(
     "MODAL_WHISPER_URL",
-    "https://your-app--whisper-transcribe.modal.run",
-).strip()
+    os.environ.get("MODAL_URL", "https://your-app--whisper-transcribe.modal.run"),
+).strip().rstrip("/")
 MODAL_XTTS_URL = os.environ.get(
     "MODAL_XTTS_URL",
     "https://your-app--kommz-voice-xtts.modal.run",
-).strip()
+).strip().rstrip("/")
 
 # Secrets
 SECRET_KEY = os.environ.get("SECRET_KEY", "").strip()

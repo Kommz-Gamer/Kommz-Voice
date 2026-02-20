@@ -66,14 +66,14 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
    VOICE LAB
 ============================== */
 .lab-view{height:100%;display:flex;flex-direction:column;overflow:hidden;}
-.lab-header{padding:26px 30px 22px;border-bottom:1px solid var(--border);display:flex;align-items:flex-end;justify-content:space-between;flex-shrink:0;}
+.lab-header{padding:28px 36px 24px;border-bottom:1px solid var(--border);display:flex;align-items:flex-end;justify-content:space-between;flex-shrink:0;}
 .lab-eyebrow{font-family:var(--mono);font-size:.6rem;color:var(--cyan);letter-spacing:.18em;text-transform:uppercase;margin-bottom:6px;}
 .lab-title{font-size:1.9rem;font-weight:800;letter-spacing:-.04em;line-height:1;}
 .lab-title span{background:linear-gradient(135deg,var(--violet-light),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
 .lab-sub{font-size:.75rem;color:var(--muted);margin-top:5px;font-weight:500;}
 .btn-new{display:flex;align-items:center;gap:8px;padding:11px 20px;background:linear-gradient(135deg,var(--violet),#4f46e5);border:none;border-radius:12px;color:#fff;font-family:var(--font);font-size:.78rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;transition:all .25s;box-shadow:0 6px 20px rgba(124,58,237,.3);}
 .btn-new:hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(124,58,237,.5);}
-.voice-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;padding:20px 30px;overflow-y:auto;flex:1;align-items:start;align-content:start;}
+.voice-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;padding:24px 36px;overflow-y:auto;flex:1;align-items:start;align-content:start;}
 
 /* VOICE CARD */
 .voice-card{background:var(--bg-panel);border:1px solid var(--border);border-radius:14px;padding:14px 16px;cursor:pointer;transition:all .25s;position:relative;overflow:hidden;height:fit-content;}
@@ -106,7 +106,7 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
    WIZARD MODAL
 ============================== */
 .modal-content{background:var(--bg-void);border:1px solid rgba(255,255,255,.08);border-radius:28px;overflow:hidden;display:flex;flex-direction:row;}
-.wiz-sidebar{width:210px;background:var(--bg-surface);border-right:1px solid var(--border);padding:36px 22px;display:flex;flex-direction:column;flex-shrink:0;}
+.wiz-sidebar{width:230px;background:var(--bg-surface);border-right:1px solid var(--border);padding:38px 24px;display:flex;flex-direction:column;flex-shrink:0;}
 .wiz-logo{width:44px;height:44px;background:linear-gradient(135deg,var(--violet),var(--cyan-dark));border-radius:13px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1.2rem;color:#fff;margin-bottom:32px;}
 .wiz-step{display:flex;align-items:center;gap:13px;margin-bottom:26px;opacity:.35;transition:opacity .3s;}
 .wiz-step.active{opacity:1;}
@@ -117,7 +117,7 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
 .wiz-spec{margin-top:auto;background:var(--bg-input);border:1px solid var(--border);border-radius:12px;padding:14px;text-align:center;}
 .wiz-spec-label{font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:3px;}
 .wiz-spec-val{font-family:var(--mono);font-size:.72rem;color:var(--cyan);}
-.wiz-body{flex:1;padding:34px 36px;overflow-y:auto;background:var(--bg-panel);}
+.wiz-body{flex:1;padding:38px 42px;overflow-y:auto;background:var(--bg-panel);}
 .wiz-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:26px;}
 .wiz-title{font-size:1.5rem;font-weight:800;letter-spacing:-.03em;}
 
@@ -397,7 +397,7 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
 
     <!-- WIZARD MODAL -->
     <div class="modal fade" id="wizModal" tabindex="-1" data-bs-backdrop="static">
-        <div class="modal-dialog modal-dialog-centered" style="max-width:1050px;">
+        <div class="modal-dialog modal-dialog-centered" style="max-width:1140px;">
             <div class="modal-content border-0" style="min-height:560px;">
                 <!-- WIZ SIDEBAR -->
                 <div class="wiz-sidebar">
