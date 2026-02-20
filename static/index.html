@@ -372,7 +372,7 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
                 <div class="api-card">
                     <div style="font-size:.95rem;font-weight:700;margin-bottom:8px;">Documentation d'inférence</div>
                     <p style="font-size:.78rem;color:var(--muted-light);margin-bottom:0;">Endpoint POST pour générer de l'audio :</p>
-                    <div class="code-block"><pre>curl -X POST https://kommz-voice-xtts.modal.run/v1/clone \
+                    <div class="code-block"><pre>curl -X POST https://votre-domaine-render.com/v1/synthesis \
   -H "Authorization: Bearer {{ user.api_key }}" \
   -H "Content-Type: application/json" \
   -d '{
@@ -380,9 +380,8 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
     "voice_id": "votre_id_de_voix",
     "speed": 1.0,
     "temperature": 0.7,
-    "emotion": "neutral",
     "language": "fr"
-  }' --output result.wav</pre></div>
+  }'</pre></div>
                 </div>
             </div>
         </div>
@@ -706,9 +705,10 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
             this.currentPreviewId=null;this.ctxId=null;
             this.mediaRecorder=null;this.micChunks=[];
             this.isMicRec=false;this.micSec=0;this.micInterval=null;
-            document.getElementById('audioFile').addEventListener('change',e=>{const f=e.target.files[0];if(f)this.uploadFile(f);});
+            const audioInput=document.getElementById('audioFile');
+            if(audioInput){audioInput.addEventListener('change',e=>{const f=e.target.files[0];if(f)this.uploadFile(f);});}
             document.addEventListener('click',()=>this.hideCtx());
-            this.loadProfiles();
+            if(document.getElementById('voiceGrid')) this.loadProfiles();
         }
 
         /* PROFILES */
@@ -898,26 +898,10 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
     }
 
     document.addEventListener('DOMContentLoaded', async () => {
-        // Si session Flask active -> sauter directement au dashboard
-        try {
-            const r = await fetch('/me');
-            if (r.ok) {
-                const user = await r.json();
-                document.getElementById('screen-license').classList.add('dn');
-                document.getElementById('screen-auth').classList.add('dn');
-                document.getElementById('screen-dashboard').classList.remove('dn');
-                const emailEl  = document.getElementById('userEmail');
-                const avatarEl = document.getElementById('userAvatar');
-                const apiKeyEl = document.getElementById('userApiKey');
-                if (emailEl)  emailEl.textContent  = user.email;
-                if (avatarEl) avatarEl.textContent = (user.email[0] || 'K').toUpperCase();
-                if (apiKeyEl) apiKeyEl.value       = user.api_key || '';
-                window.app = new KommzApp();
-                return;
-            }
-        } catch(e) {}
-        // Pas de session -> ecran licence
-        window.app = new KommzApp();
+        // Init uniquement les handlers correspondant à la vue rendue par Jinja.
+        const hasDashboard = !!document.getElementById('voiceGrid');
+        const hasAuthFlow = !!document.getElementById('screen-license');
+        if (hasDashboard || hasAuthFlow) window.app = new KommzApp();
     });
     </script>
 </body>

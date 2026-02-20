@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+
+# Environments / secrets
+.env
+.env.*
+!.env.template
+*.pem
+*.key
+*.p12
+
+# Logs / dumps / exports
+*.log
+*.dump
+*.sql.gz
+*.bak
+secrets/
+exports/
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

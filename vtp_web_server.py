@@ -30,13 +30,13 @@ INSTALLATION :
   pip install flask flask-session supabase python-dotenv requests gunicorn
 
 VARIABLES D'ENVIRONNEMENT (.env) :
-  SUPABASE_URL=https://xxxxxxxx.supabase.co
-  SUPABASE_KEY=eyJhbGci...   (service role key — jamais côté client !)
-  SUPABASE_ANON_KEY=eyJ...   (pour auth côté client si besoin)
+  SUPABASE_URL=https://YOUR_PROJECT.supabase.co
+  SUPABASE_KEY=CHANGE_ME_SUPABASE_SERVICE_ROLE   (jamais côté client)
+  SUPABASE_ANON_KEY=CHANGE_ME_SUPABASE_ANON      (optionnel)
   MODAL_WHISPER_URL=https://votre-app--whisper.modal.run
   MODAL_XTTS_URL=https://votre-app--kommz-voice-xtts.modal.run
-  SECRET_KEY=une_cle_tres_longue_et_aleatoire
-  VOICE_SECRET_SALT=VTP-KOMMZ-VOICE-2026-X77
+  SECRET_KEY=CHANGE_ME_FLASK_SECRET
+  VOICE_SECRET_SALT=CHANGE_ME_VOICE_SALT
 
 =============================================================================
 """
@@ -47,6 +47,8 @@ import hashlib
 import hmac
 import time
 import tempfile
+import base64
+import json as pyjson
 import requests
 from datetime import datetime
 from functools import wraps
@@ -64,23 +66,88 @@ load_dotenv()
 # CONFIG
 # =============================================================================
 
+FLASK_ENV = os.environ.get("FLASK_ENV", "production").lower()
+IS_PRODUCTION = FLASK_ENV == "production"
+
+# Supabase
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "").strip()
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "").strip()
+
+# Modal endpoints
+MODAL_WHISPER_URL = os.environ.get(
+    "MODAL_WHISPER_URL",
+    "https://your-app--whisper-transcribe.modal.run",
+).strip()
+MODAL_XTTS_URL = os.environ.get(
+    "MODAL_XTTS_URL",
+    "https://your-app--kommz-voice-xtts.modal.run",
+).strip()
+
+# Secrets
+SECRET_KEY = os.environ.get("SECRET_KEY", "").strip()
+VOICE_SECRET_SALT = os.environ.get("VOICE_SECRET_SALT", "").strip()
+PASSWORD_SALT = os.environ.get("PASSWORD_SALT", "").strip()
+ADMIN_SECRET = os.environ.get("ADMIN_SECRET", "").strip()
+
+
+def _jwt_payload(token: str) -> dict:
+    """Decode unverified JWT payload (best effort)."""
+    try:
+        parts = token.split(".")
+        if len(parts) != 3:
+            return {}
+        payload = parts[1]
+        payload += "=" * (-len(payload) % 4)
+        decoded = base64.urlsafe_b64decode(payload.encode("utf-8"))
+        return pyjson.loads(decoded.decode("utf-8"))
+    except Exception:
+        return {}
+
+
+def _is_probably_anon_supabase_key(key: str) -> bool:
+    payload = _jwt_payload(key)
+    return payload.get("role") == "anon"
+
+
+def validate_runtime_config() -> None:
+    missing = []
+    required = {
+        "SUPABASE_URL": SUPABASE_URL,
+        "SUPABASE_KEY": SUPABASE_KEY,
+        "SECRET_KEY": SECRET_KEY,
+        "VOICE_SECRET_SALT": VOICE_SECRET_SALT,
+        "PASSWORD_SALT": PASSWORD_SALT,
+        "ADMIN_SECRET": ADMIN_SECRET,
+    }
+    for name, value in required.items():
+        if not value:
+            missing.append(name)
+
+    if missing and IS_PRODUCTION:
+        raise RuntimeError(f"Variables manquantes en production: {', '.join(missing)}")
+
+    if SUPABASE_KEY and _is_probably_anon_supabase_key(SUPABASE_KEY):
+        msg = "SUPABASE_KEY semble être une clé anon. Une service_role est requise côté serveur."
+        if IS_PRODUCTION:
+            raise RuntimeError(msg)
+        print(f"[WARN] {msg}")
+
+    if IS_PRODUCTION and SECRET_KEY in {"dev-secret-change-in-production", "CHANGE_ME"}:
+        raise RuntimeError("SECRET_KEY invalide en production.")
+    if IS_PRODUCTION and ADMIN_SECRET in {"admin-secret-change-this", "CHANGE_ME"}:
+        raise RuntimeError("ADMIN_SECRET invalide en production.")
+
+
+validate_runtime_config()
+
 app = Flask(__name__, static_folder="static", template_folder="templates")
-app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-change-in-production")
+app.secret_key = SECRET_KEY or "dev-only-secret-change-me"
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["MAX_CONTENT_LENGTH"] = 64 * 1024 * 1024  # 64 MB max upload
 
-# Supabase
-SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")  # Service role (côté serveur uniquement)
+# Supabase client (service role côté serveur uniquement)
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-
-# Modal endpoints
-MODAL_WHISPER_URL = os.environ.get("MODAL_WHISPER_URL", "https://your-app--whisper-transcribe.modal.run")
-MODAL_XTTS_URL    = os.environ.get("MODAL_XTTS_URL",    "https://your-app--kommz-voice-xtts.modal.run")
-
-# Licence Voice
-VOICE_SECRET_SALT = os.environ.get("VOICE_SECRET_SALT", "VTP-KOMMZ-VOICE-2026-X77")
 
 # Bucket Supabase Storage pour les fichiers audio
 STORAGE_BUCKET = "voice-references"
@@ -114,7 +181,7 @@ def login_required(f):
 
 def hash_password(password: str) -> str:
     """SHA-256 + salt fixe. En prod, préférer bcrypt."""
-    salt = os.environ.get("PASSWORD_SALT", "KommzVoiceSalt2026!")
+    salt = PASSWORD_SALT or "dev-password-salt-change-me"
     return hashlib.sha256(f"{salt}{password}".encode()).hexdigest()
 
 
@@ -881,8 +948,6 @@ def api_synthesis():
 # =============================================================================
 # ADMIN — Routes de gestion des clés (protégées par clé admin)
 # =============================================================================
-
-ADMIN_SECRET = os.environ.get("ADMIN_SECRET", "admin-secret-change-this")
 
 def admin_required(f):
     @wraps(f)
