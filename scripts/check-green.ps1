@@ -60,7 +60,7 @@ try {
 
 $results | Format-Table -AutoSize
 
-$failed = $results | Where-Object { -not $_.Ok }
+$failed = $results | Where-Object { $_.Ok -eq $false }
 if ($failed.Count -gt 0) {
     Write-Error "GO/NO-GO: NO-GO ($($failed.Count) check(s) failed)."
     exit 1
