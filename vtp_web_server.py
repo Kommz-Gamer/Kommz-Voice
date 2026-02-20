@@ -86,6 +86,7 @@ MODAL_XTTS_URL = os.environ.get(
 # Secrets
 SECRET_KEY = os.environ.get("SECRET_KEY", "").strip()
 VOICE_SECRET_SALT = os.environ.get("VOICE_SECRET_SALT", "").strip()
+DESKTOP_SECRET_SALT = os.environ.get("DESKTOP_SECRET_SALT", "VTP-2025-MAKE-AUTOMATION-X99").strip()
 PASSWORD_SALT = os.environ.get("PASSWORD_SALT", "").strip()
 ADMIN_SECRET = os.environ.get("ADMIN_SECRET", "").strip()
 
@@ -218,14 +219,46 @@ def verify_vcv_key(key: str) -> dict:
     except (ValueError, IndexError):
         return {"valid": False, "expired": False, "expiration_ts": 0}
 
-    # Vérification signature
-    # Format Make.com : SHA256(timestamp + random + salt) — sans séparateur
-    expected_sig = hashlib.sha256(f"{ts_str}{rand}{VOICE_SECRET_SALT}".encode()).hexdigest()[:8].upper()
+    # Vérification signature (compatibilité: ancien + nouveau format)
+    sig_upper = sig.upper()
+    expected_ts_rand_salt = hashlib.sha256(f"{ts_str}{rand}{VOICE_SECRET_SALT}".encode()).hexdigest()[:8].upper()
+    expected_salt_ts_rand = hashlib.sha256(f"{VOICE_SECRET_SALT}{ts_str}{rand}".encode()).hexdigest()[:8].upper()
 
-    if not hmac.compare_digest(sig.upper(), expected_sig):
+    if not (
+        hmac.compare_digest(sig_upper, expected_ts_rand_salt)
+        or hmac.compare_digest(sig_upper, expected_salt_ts_rand)
+    ):
         return {"valid": False, "expired": False, "expiration_ts": 0}
 
     # Vérification expiration
+    expired = expiration_ts < int(time.time())
+    return {"valid": True, "expired": expired, "expiration_ts": expiration_ts}
+
+
+def verify_vtp_key(key: str) -> dict:
+    """
+    Vérifie une clé VTP desktop.
+    Format : VTP-{timestamp_expiration}-{random4}-{sha256[:8]}
+    """
+    parts = key.split("-")
+    if len(parts) != 4 or parts[0] != "VTP":
+        return {"valid": False, "expired": False, "expiration_ts": 0}
+
+    try:
+        ts_str, rand, sig = parts[1], parts[2], parts[3]
+        expiration_ts = int(ts_str)
+    except (ValueError, IndexError):
+        return {"valid": False, "expired": False, "expiration_ts": 0}
+
+    sig_upper = sig.upper()
+    expected_ts_rand_salt = hashlib.sha256(f"{ts_str}{rand}{DESKTOP_SECRET_SALT}".encode()).hexdigest()[:8].upper()
+    expected_salt_ts_rand = hashlib.sha256(f"{DESKTOP_SECRET_SALT}{ts_str}{rand}".encode()).hexdigest()[:8].upper()
+    if not (
+        hmac.compare_digest(sig_upper, expected_ts_rand_salt)
+        or hmac.compare_digest(sig_upper, expected_salt_ts_rand)
+    ):
+        return {"valid": False, "expired": False, "expiration_ts": 0}
+
     expired = expiration_ts < int(time.time())
     return {"valid": True, "expired": expired, "expiration_ts": expiration_ts}
 
@@ -485,6 +518,80 @@ def verify_voice_license_web():
         "already_used": False,
         "expiration":   expiration_date,
     })
+
+
+def _activate_desktop_license_common(product: str):
+    """
+    Activation serveur pour desktop (source de vérité).
+    Règle: une clé est liée à un seul email, mais cet email peut changer de PC.
+    """
+    data = request.get_json() or {}
+    key = (data.get("license_key") or "").strip().upper()
+    email = (data.get("email") or "").strip().lower()
+    hwid = (data.get("hwid") or "").strip().upper()
+
+    if not key or not email or "@" not in email or not hwid:
+        return jsonify({"ok": False, "error": "Paramètres manquants"}), 400
+
+    if product == "voice":
+        check = verify_vcv_key(key)
+        expected_products = {"voice", "bundle"}
+    else:
+        check = verify_vtp_key(key)
+        expected_products = {"gamer", "bundle"}
+
+    if not check["valid"]:
+        return jsonify({"ok": False, "error": "Clé invalide"}), 403
+    if check["expired"]:
+        return jsonify({"ok": False, "error": "Clé expirée"}), 403
+
+    expiration_date = datetime.utcfromtimestamp(check["expiration_ts"]).strftime("%d/%m/%Y") \
+        if check["expiration_ts"] < 9999999999 else "Illimité"
+
+    try:
+        existing_resp = supabase.table("license_keys").select("*").eq("key_value", key).execute()
+        existing = (existing_resp.data or [{}])[0]
+
+        existing_email = (existing.get("activated_by_email") or "").strip().lower()
+        if existing_email and existing_email != email:
+            return jsonify({
+                "ok": False,
+                "error": "Cette clé est déjà associée à un autre utilisateur"
+            }), 409
+
+        existing_product = (existing.get("product") or "").strip().lower()
+        if existing_product and existing_product not in expected_products:
+            return jsonify({"ok": False, "error": "Clé incompatible avec ce produit"}), 409
+
+        hwid_history_raw = (existing.get("desktop_hwid") or "").strip()
+        hwids = [h.strip().upper() for h in hwid_history_raw.split(",") if h.strip()]
+        if hwid not in hwids:
+            hwids.append(hwid)
+        desktop_hwid = ",".join(hwids)
+
+        row = {
+            "key_value": key,
+            "product": existing_product or product,
+            "is_activated": True,
+            "activated_by_email": email,
+            "desktop_hwid": desktop_hwid,
+            "expiration": expiration_date,
+            "activated_at": datetime.utcnow().isoformat(),
+        }
+        supabase.table("license_keys").upsert(row).execute()
+        return jsonify({"ok": True, "expiration": expiration_date})
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"Erreur DB: {e}"}), 500
+
+
+@app.route("/license/desktop/activate", methods=["POST"])
+def activate_desktop_gamer_license():
+    return _activate_desktop_license_common("gamer")
+
+
+@app.route("/license/voice/activate-desktop", methods=["POST"])
+def activate_desktop_voice_license():
+    return _activate_desktop_license_common("voice")
 
 
 # =============================================================================
