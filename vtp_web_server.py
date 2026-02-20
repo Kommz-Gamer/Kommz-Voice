@@ -864,6 +864,16 @@ def transcribe_audio(file_id):
 
     # Envoi vers Modal Whisper endpoint
     try:
+        if (
+            not MODAL_WHISPER_URL
+            or "your-app--whisper-transcribe" in MODAL_WHISPER_URL
+            or "votre-app--whisper" in MODAL_WHISPER_URL
+        ):
+            return jsonify({
+                "success": False,
+                "error": "MODAL_WHISPER_URL non configurée (placeholder détecté)."
+            }), 500
+
         whisper_response = requests.post(
             f"{MODAL_WHISPER_URL}/transcribe",
             files={"audio": (file_id, file_bytes, "audio/wav")},
