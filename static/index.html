@@ -554,6 +554,11 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+    /* Force route root when opened via static path */
+    if (window.location.pathname.toLowerCase().includes('/static/index.html')) {
+        window.location.replace('/');
+    }
+
     /* === LICENCE KEY GATE === */
     let _verifiedLicenseKey = '';
 
@@ -649,7 +654,7 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
         try{
             const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.fromEntries(fd))});
             const res=await r.json();
-            if(res.success){location.reload();}else{btn.disabled=false;btn.textContent=url==='/login'?'Initialiser →':'Créer →';showToast('Erreur',res.error||'Auth échouée','error');}
+            if(res.success){window.location.assign('/');}else{btn.disabled=false;btn.textContent=url==='/login'?'Initialiser →':'Créer →';showToast('Erreur',res.error||'Auth échouée','error');}
         }catch(ex){btn.disabled=false;btn.textContent='Réessayer →';}
     }
 
