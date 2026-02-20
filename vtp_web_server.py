@@ -139,11 +139,6 @@ def verify_vcv_key(key: str) -> dict:
     MASTER_KEYS = ["VTP-VOICE-ADMIN", "NICOLAS-VOICE-PRO"]
     if key in MASTER_KEYS:
         return {"valid": True, "expired": False, "expiration_ts": 9999999999}
-		
-	# Clé Access (KOMMZ-) — valide cryptographiquement mais pas autorisée sur ce site
-    if key.startswith("KOMMZ-"):
-        return {"valid": False, "expired": False, "expiration_ts": 0, 
-                "error": "Cette clé est pour Kommz Access, pas pour Kommz Voice. Rendez-vous sur kommz.fr"}	
 
     parts = key.split("-")
     # Format : VCV-TIMESTAMP-RANDOM-SIG8 → 4 parties
@@ -157,8 +152,8 @@ def verify_vcv_key(key: str) -> dict:
         return {"valid": False, "expired": False, "expiration_ts": 0}
 
     # Vérification signature
-    payload = f"{ts_str}-{rand}"
-    expected_sig = hashlib.sha256(f"{VOICE_SECRET_SALT}{payload}".encode()).hexdigest()[:8].upper()
+    # Format Make.com : SHA256(timestamp + random + salt) — sans séparateur
+    expected_sig = hashlib.sha256(f"{ts_str}{rand}{VOICE_SECRET_SALT}".encode()).hexdigest()[:8].upper()
     
     if not hmac.compare_digest(sig.upper(), expected_sig):
         return {"valid": False, "expired": False, "expiration_ts": 0}
