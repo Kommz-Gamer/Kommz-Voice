@@ -317,6 +317,22 @@ def login():
     session["user_id"] = user["id"]
     session["email"]   = user["email"]
 
+    # Synchroniser license_keys si l'entrée est manquante
+    # (cas des comptes créés avant que la table license_keys existait)
+    license_key = user.get("license_key", "")
+    if license_key:
+        try:
+            supabase.table("license_keys").upsert({
+                "key_value":            license_key,
+                "product":              "voice",
+                "is_activated":         True,
+                "activated_by_email":   user["email"],
+                "activated_by_user_id": user["id"],
+                "activated_at":         datetime.utcnow().isoformat(),
+            }, on_conflict="key_value").execute()
+        except Exception as sync_err:
+            print(f"[WARN] Sync license_keys échoué: {sync_err}")
+
     return jsonify({
         "success": True,
         "user_id": user["id"],
