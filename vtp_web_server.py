@@ -172,12 +172,34 @@ def ensure_storage_bucket() -> None:
             names.add(str(name))
 
     if STORAGE_BUCKET not in names:
-        try:
-            supabase.storage.create_bucket(STORAGE_BUCKET, {"public": True})
-        except TypeError:
-            # Compat client Supabase plus ancien
-            supabase.storage.create_bucket(STORAGE_BUCKET)
-        print(f"[INFO] Bucket crÃ©Ã© automatiquement: {STORAGE_BUCKET}")
+        created = False
+        errors = []
+
+        # Compat multi-versions supabase-py/storage
+        create_attempts = [
+            lambda: supabase.storage.create_bucket(STORAGE_BUCKET, {"public": True}),
+            lambda: supabase.storage.create_bucket(STORAGE_BUCKET),
+            lambda: supabase.storage.create_bucket({"name": STORAGE_BUCKET, "public": True}),
+            lambda: supabase.storage.create_bucket({"id": STORAGE_BUCKET, "name": STORAGE_BUCKET, "public": True}),
+            lambda: supabase.storage.create_bucket(name=STORAGE_BUCKET, options={"public": True}),
+            lambda: supabase.storage.create_bucket(name=STORAGE_BUCKET),
+        ]
+
+        for attempt in create_attempts:
+            try:
+                attempt()
+                created = True
+                break
+            except Exception as e:
+                errors.append(str(e))
+
+        if not created:
+            raise RuntimeError(
+                f"Impossible de creer le bucket '{STORAGE_BUCKET}'. "
+                f"Erreurs: {' | '.join(errors)}"
+            )
+
+        print(f"[INFO] Bucket cree automatiquement: {STORAGE_BUCKET}")
 
     _storage_bucket_checked = True
 
