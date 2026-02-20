@@ -139,6 +139,11 @@ def verify_vcv_key(key: str) -> dict:
     MASTER_KEYS = ["VTP-VOICE-ADMIN", "NICOLAS-VOICE-PRO"]
     if key in MASTER_KEYS:
         return {"valid": True, "expired": False, "expiration_ts": 9999999999}
+		
+	# Clé Access (KOMMZ-) — valide cryptographiquement mais pas autorisée sur ce site
+    if key.startswith("KOMMZ-"):
+        return {"valid": False, "expired": False, "expiration_ts": 0, 
+                "error": "Cette clé est pour Kommz Access, pas pour Kommz Voice. Rendez-vous sur kommz.fr"}	
 
     parts = key.split("-")
     # Format : VCV-TIMESTAMP-RANDOM-SIG8 → 4 parties
