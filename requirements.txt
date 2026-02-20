@@ -1,0 +1,6 @@
+flask
+flask-session
+supabase
+python-dotenv
+requests
+gunicorn
