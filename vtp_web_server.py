@@ -874,12 +874,25 @@ def transcribe_audio(file_id):
                 "error": "MODAL_WHISPER_URL non configurée (placeholder détecté)."
             }), 500
 
+        whisper_payload_files = {"audio": (file_id, file_bytes, "audio/wav")}
+        whisper_payload_data = {"model": model}
+
+        # Compat endpoints Modal:
+        # - certains déploiements exposent POST /transcribe
+        # - d'autres exposent POST / (URL déjà "fonction")
         whisper_response = requests.post(
             f"{MODAL_WHISPER_URL}/transcribe",
-            files={"audio": (file_id, file_bytes, "audio/wav")},
-            data={"model": model},
+            files=whisper_payload_files,
+            data=whisper_payload_data,
             timeout=120  # Whisper peut prendre jusqu'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  2 min sur large-v3
         )
+        if whisper_response.status_code == 404:
+            whisper_response = requests.post(
+                MODAL_WHISPER_URL,
+                files=whisper_payload_files,
+                data=whisper_payload_data,
+                timeout=120
+            )
 
         if not whisper_response.ok:
             return jsonify({
