@@ -897,7 +897,28 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
         }
     }
 
-    document.addEventListener('DOMContentLoaded',()=>{window.app=new KommzApp();});
+    document.addEventListener('DOMContentLoaded', async () => {
+        // Si session Flask active -> sauter directement au dashboard
+        try {
+            const r = await fetch('/me');
+            if (r.ok) {
+                const user = await r.json();
+                document.getElementById('screen-license').classList.add('dn');
+                document.getElementById('screen-auth').classList.add('dn');
+                document.getElementById('screen-dashboard').classList.remove('dn');
+                const emailEl  = document.getElementById('userEmail');
+                const avatarEl = document.getElementById('userAvatar');
+                const apiKeyEl = document.getElementById('userApiKey');
+                if (emailEl)  emailEl.textContent  = user.email;
+                if (avatarEl) avatarEl.textContent = (user.email[0] || 'K').toUpperCase();
+                if (apiKeyEl) apiKeyEl.value       = user.api_key || '';
+                window.app = new KommzApp();
+                return;
+            }
+        } catch(e) {}
+        // Pas de session -> ecran licence
+        window.app = new KommzApp();
+    });
     </script>
 </body>
 </html>
