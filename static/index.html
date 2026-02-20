@@ -227,10 +227,10 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
 
             <div style="margin-bottom:8px;">
                 <label class="field-label">Clé de licence Voice</label>
-                <input 
-                    type="text" 
+                <input
+                    type="text"
                     id="licenseKeyInput"
-                    class="kommz-input" 
+                    class="kommz-input"
                     placeholder="VCV-XXXXXXXXXX-XXXX-XXXXXXXX"
                     style="font-family:var(--mono);letter-spacing:.05em;text-align:center;font-size:.82rem;"
                     oninput="this.value=this.value.toUpperCase()"
@@ -240,9 +240,9 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
 
             <div id="licenseKeyError" style="font-size:.72rem;color:var(--red);min-height:20px;margin-bottom:12px;text-align:center;"></div>
 
-            <button 
+            <button
                 id="btnVerifyLicense"
-                class="btn-violet" 
+                class="btn-violet"
                 onclick="verifyLicenseKey()"
                 style="margin-bottom:20px;"
             >
@@ -257,7 +257,7 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
             </div>
 
             <!-- Déjà un compte -->
-            <button 
+            <button
                 class="btn-violet"
                 style="background:rgba(255,255,255,.04);border:1px solid var(--border);box-shadow:none;color:var(--muted-light);"
                 onclick="showLoginOnly()"
@@ -268,7 +268,7 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
             </button>
 
             <p style="text-align:center;font-size:.65rem;color:var(--muted);margin-top:20px;">
-                Pas encore de licence ? 
+                Pas encore de licence ?
                 <a href="https://kommz.fr/#pricing" target="_blank" style="color:var(--violet-light);text-decoration:none;font-weight:700;">Voir les offres →</a>
             </p>
         </div>

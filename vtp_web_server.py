@@ -197,10 +197,10 @@ def generate_api_key() -> str:
 def verify_vcv_key(key: str) -> dict:
     """
     Vérifie une clé VCV-TIMESTAMP-RANDOM-SIG8.
-    
+
     Format : VCV-{timestamp_expiration}-{random4}-{sha256[:8]}
     Salt    : VOICE_SECRET_SALT
-    
+
     Retourne : {"valid": bool, "expired": bool, "expiration_ts": int}
     """
     MASTER_KEYS = ["VTP-VOICE-ADMIN", "NICOLAS-VOICE-PRO"]
@@ -221,7 +221,7 @@ def verify_vcv_key(key: str) -> dict:
     # Vérification signature
     # Format Make.com : SHA256(timestamp + random + salt) — sans séparateur
     expected_sig = hashlib.sha256(f"{ts_str}{rand}{VOICE_SECRET_SALT}".encode()).hexdigest()[:8].upper()
-    
+
     if not hmac.compare_digest(sig.upper(), expected_sig):
         return {"valid": False, "expired": False, "expiration_ts": 0}
 
@@ -257,7 +257,7 @@ def register():
     """
     Inscription.
     Body JSON : { email, password, license_key }
-    
+
     La clé VCV- est obligatoire pour s'inscrire.
     Elle est marquée comme utilisée en Supabase après succès.
     """
@@ -289,7 +289,7 @@ def register():
             .eq("product", "voice")\
             .single()\
             .execute()
-        
+
         if lic_check.data and lic_check.data.get("is_activated") and lic_check.data.get("activated_by_email") != email:
             return jsonify({
                 "success": False,
@@ -326,7 +326,7 @@ def register():
     # Marquer la clé comme activée dans license_keys
     expiration_date = datetime.utcfromtimestamp(vcv_result["expiration_ts"]).strftime("%d/%m/%Y") \
         if vcv_result["expiration_ts"] < 9999999999 else "Illimité"
-    
+
     try:
         # Upsert (insert ou update si déjà présent)
         supabase.table("license_keys").upsert({
@@ -436,9 +436,9 @@ def me():
 def verify_voice_license_web():
     """
     Vérifie une clé VCV- AVANT inscription.
-    
+
     Body JSON : { license_key: "VCV-..." }
-    
+
     Réponses :
       { valid: true,  already_used: false, expiration: "30/06/2027" }
       { valid: true,  already_used: true,  email: "user@email.com" }  ← proposer login
@@ -512,7 +512,7 @@ def get_profiles():
 def save_profile():
     """
     Sauvegarde un nouveau profil vocal en Supabase.
-    
+
     Body JSON :
     {
       file_id:        "uuid",          ← ID du fichier uploadé via /api/upload-reference
@@ -583,7 +583,7 @@ def delete_profile(profile_id):
             .eq("user_id", user_id)\
             .single()\
             .execute()
-        
+
         if not check.data:
             return jsonify({"success": False, "error": "Profil introuvable"}), 404
 
@@ -616,9 +616,9 @@ def delete_profile(profile_id):
 def upload_reference():
     """
     Upload un fichier audio de référence vers Supabase Storage.
-    
+
     FormData : file (audio/*)
-    
+
     Retourne : { success: true, file_id: "uuid", duration_estimate: 30 }
     """
     if "file" not in request.files:
@@ -641,7 +641,7 @@ def upload_reference():
     try:
         # Lecture du contenu
         file_bytes = f.read()
-        
+
         # Upload vers Supabase Storage
         supabase.storage.from_(STORAGE_BUCKET).upload(
             path=storage_path,
@@ -669,15 +669,15 @@ def upload_reference():
 def transcribe_audio(file_id):
     """
     Lance la transcription Whisper d'un fichier audio via Modal.run.
-    
+
     URL params : file_id = nom du fichier uploadé
     Body JSON  : { model: "small" | "large-v3" }
-    
+
     Le flux :
       1. Récupère le fichier depuis Supabase Storage
       2. L'envoie au endpoint Whisper sur Modal.run
       3. Retourne la transcription
-    
+
     Retourne : { success: true, text: "La transcription...", language: "fr" }
     """
     data        = request.get_json() or {}
@@ -705,7 +705,7 @@ def transcribe_audio(file_id):
             data={"model": model},
             timeout=120  # Whisper peut prendre jusqu'à 2 min sur large-v3
         )
-        
+
         if not whisper_response.ok:
             return jsonify({
                 "success": False,
@@ -740,7 +740,7 @@ def transcribe_audio(file_id):
 def generate_voice():
     """
     Génère un fichier audio via XTTS v2 sur Modal.run.
-    
+
     Body JSON :
     {
       text:       "Le texte à synthétiser",
@@ -749,9 +749,9 @@ def generate_voice():
       speed:      1.0,
       temperature: 0.7
     }
-    
+
     Retourne : { success: true, audio_url: "https://..." } ou stream audio
-    
+
     Note : Pour de grosses demandes, préférer un système de job async.
            Pour l'instant, on attend la réponse Modal directement.
     """
@@ -819,7 +819,7 @@ def generate_voice():
 
         # L'endpoint Modal retourne directement le fichier WAV
         audio_bytes = xtts_response.content
-        
+
         # Upload du résultat dans Supabase Storage pour accès ultérieur
         result_path = f"generated/{user_id}/{uuid.uuid4()}.wav"
         try:
@@ -853,7 +853,7 @@ def generate_voice():
 def api_synthesis():
     """
     Endpoint API externe — authentification par clé API dans le header.
-    
+
     Header : Authorization: Bearer KV-VOTRE_CLE_API
     Body JSON :
     {

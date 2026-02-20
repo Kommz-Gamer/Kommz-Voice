@@ -57,7 +57,7 @@ app = modal.App("kommz-whisper", image=image)
     memory=4096,                 # 4GB RAM
 )
 class WhisperModel:
-    
+
     @modal.enter()
     def load_model(self):
         """Chargé une seule fois au démarrage du container."""
@@ -73,12 +73,12 @@ class WhisperModel:
     def transcribe(self, audio_bytes: bytes, filename: str, model_name: str = "small") -> dict:
         """
         Transcrit un fichier audio.
-        
+
         Args:
             audio_bytes : Contenu binaire du fichier audio
             filename    : Nom original du fichier (pour déterminer le format)
             model_name  : "small" ou "large-v3"
-        
+
         Returns:
             dict avec text, language, duration
         """
@@ -140,7 +140,7 @@ async def transcribe(
 ):
     """
     Endpoint HTTP pour la transcription Whisper.
-    
+
     FormData:
       audio : fichier audio (WAV, MP3, FLAC, etc.)
       model : "small" | "large-v3"
