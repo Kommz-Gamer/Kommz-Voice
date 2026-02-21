@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kommz Voice — XTTS v2 Engine</title>
+    <title>Kommz Voice â€” Moteur vocal IA</title>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
@@ -210,9 +210,9 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
 
     {% if not user %}
 
-    <!-- ════════════════════════════════════════════
-         ÉCRAN 0 — VÉRIFICATION LICENCE KEY (GATE)
-    ════════════════════════════════════════════ -->
+    <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+         Ã‰CRAN 0 â€” VÃ‰RIFICATION LICENCE KEY (GATE)
+    â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
     <div id="screen-license" class="auth-screen">
         <div class="glow glow-1"></div>
         <div class="glow glow-2"></div>
@@ -221,16 +221,16 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
             <div style="text-align:center;margin-bottom:32px;">
                 <div class="auth-logo" style="margin:0 auto 14px;width:60px;height:60px;font-size:1.8rem;">K</div>
                 <div style="font-size:1.3rem;font-weight:800;letter-spacing:-.03em;">Kommz Voice</div>
-                <div style="font-family:var(--mono);font-size:.58rem;color:var(--violet-light);font-weight:600;letter-spacing:.15em;text-transform:uppercase;margin-top:4px;">XTTS v2 Cloning Engine</div>
+                <div style="font-family:var(--mono);font-size:.58rem;color:var(--violet-light);font-weight:600;letter-spacing:.15em;text-transform:uppercase;margin-top:4px;">Moteur vocal IA</div>
             </div>
 
-            <!-- Icône verrou -->
+            <!-- IcÃ´ne verrou -->
             <div style="text-align:center;margin-bottom:24px;">
-                <div style="width:56px;height:56px;background:rgba(124,58,237,.1);border:1px solid rgba(124,58,237,.25);border-radius:16px;display:inline-flex;align-items:center;justify-content:center;font-size:1.6rem;">🔑</div>
+                <div style="width:56px;height:56px;background:rgba(124,58,237,.1);border:1px solid rgba(124,58,237,.25);border-radius:16px;display:inline-flex;align-items:center;justify-content:center;font-size:1.6rem;">ðŸ”‘</div>
             </div>
 
             <div style="margin-bottom:8px;">
-                <label class="field-label">Clé de licence Voice</label>
+                <label class="field-label">ClÃ© de licence Voice</label>
                 <input
                     type="text"
                     id="licenseKeyInput"
@@ -250,17 +250,17 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
                 onclick="verifyLicenseKey()"
                 style="margin-bottom:20px;"
             >
-                Vérifier la licence →
+                VÃ©rifier la licence â†’
             </button>
 
-            <!-- Séparateur -->
+            <!-- SÃ©parateur -->
             <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
                 <div style="flex:1;height:1px;background:var(--border);"></div>
                 <span style="font-family:var(--mono);font-size:.58rem;color:var(--muted);letter-spacing:.1em;">OU</span>
                 <div style="flex:1;height:1px;background:var(--border);"></div>
             </div>
 
-            <!-- Déjà un compte -->
+            <!-- DÃ©jÃ  un compte -->
             <button
                 class="btn-violet"
                 style="background:rgba(255,255,255,.04);border:1px solid var(--border);box-shadow:none;color:var(--muted-light);"
@@ -268,7 +268,7 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
                 onmouseover="this.style.background='rgba(255,255,255,.07)'"
                 onmouseout="this.style.background='rgba(255,255,255,.04)'"
             >
-                J'ai déjà un compte — Se connecter
+                J'ai dÃ©jÃ  un compte â€” Se connecter
             </button>
 
             <button
@@ -281,14 +281,14 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
 
             <p style="text-align:center;font-size:.65rem;color:var(--muted);margin-top:20px;">
                 Pas encore de licence ?
-                <a href="https://kommz.fr/#pricing" target="_blank" style="color:var(--violet-light);text-decoration:none;font-weight:700;">Voir les offres →</a>
+                <a href="https://kommz.fr/#pricing" target="_blank" style="color:var(--violet-light);text-decoration:none;font-weight:700;">Voir les offres â†’</a>
             </p>
         </div>
     </div>
 
-    <!-- ════════════════════════════════════════════
-         ÉCRAN 1 — LOGIN / REGISTER (après validation)
-    ════════════════════════════════════════════ -->
+    <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+         Ã‰CRAN 1 â€” LOGIN / REGISTER (aprÃ¨s validation)
+    â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
     <div id="screen-auth" class="auth-screen dn">
         <div class="glow glow-1"></div>
         <div class="glow glow-2"></div>
@@ -297,11 +297,11 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
                 <div class="auth-logo">K</div>
                 <div>
                     <div style="font-size:1.25rem;font-weight:800;letter-spacing:-.03em;">Kommz Voice</div>
-                    <div style="font-family:var(--mono);font-size:.6rem;color:var(--violet-light);font-weight:600;letter-spacing:.14em;text-transform:uppercase;margin-top:2px;">XTTS v2 Cloning Engine</div>
+                    <div style="font-family:var(--mono);font-size:.6rem;color:var(--violet-light);font-weight:600;letter-spacing:.14em;text-transform:uppercase;margin-top:2px;">Moteur vocal IA</div>
                 </div>
-                <!-- Badge licence validée -->
+                <!-- Badge licence validÃ©e -->
                 <div id="licenseBadgeAuth" style="margin-left:auto;display:none;align-items:center;gap:5px;background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.2);color:#10b981;padding:4px 10px;border-radius:20px;font-family:var(--mono);font-size:.58rem;font-weight:700;white-space:nowrap;">
-                    ✓ LICENCE OK
+                    âœ“ LICENCE OK
                 </div>
             </div>
             <div class="auth-tabs">
@@ -310,9 +310,9 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
             </div>
             <div id="auth-login">
                 <form onsubmit="handleAuth(event,'/login')">
-                    <div style="margin-bottom:16px;"><label class="field-label">Identifiant réseau</label><input type="email" name="email" id="loginEmail" class="kommz-input" placeholder="votre@email.com" required></div>
-                    <div style="margin-bottom:24px;"><label class="field-label">Clé d'accès</label><input type="password" name="password" class="kommz-input" placeholder="••••••••••••" required></div>
-                    <button class="btn-violet">Initialiser le système →</button>
+                    <div style="margin-bottom:16px;"><label class="field-label">Identifiant rÃ©seau</label><input type="email" name="email" id="loginEmail" class="kommz-input" placeholder="votre@email.com" required></div>
+                    <div style="margin-bottom:24px;"><label class="field-label">ClÃ© d'accÃ¨s</label><input type="password" name="password" class="kommz-input" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" required></div>
+                    <button class="btn-violet">Initialiser le systÃ¨me â†’</button>
                 </form>
             </div>
             <div id="auth-register" class="dn">
@@ -320,13 +320,13 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
                     <input type="hidden" name="license_key" id="hiddenLicenseKey">
                     <input type="hidden" name="trial_mode" id="hiddenTrialMode" value="0">
                     <input type="hidden" name="trial_fingerprint" id="hiddenTrialFingerprint" value="">
-                    <div style="margin-bottom:16px;"><label class="field-label">Créer un identifiant</label><input type="email" name="email" id="registerEmail" class="kommz-input" placeholder="votre@email.com" required></div>
-                    <div style="margin-bottom:24px;"><label class="field-label">Définir une clé</label><input type="password" name="password" class="kommz-input" placeholder="Mot de passe fort" required></div>
-                    <button class="btn-violet">Créer le compte →</button>
+                    <div style="margin-bottom:16px;"><label class="field-label">CrÃ©er un identifiant</label><input type="email" name="email" id="registerEmail" class="kommz-input" placeholder="votre@email.com" required></div>
+                    <div style="margin-bottom:24px;"><label class="field-label">DÃ©finir une clÃ©</label><input type="password" name="password" class="kommz-input" placeholder="Mot de passe fort" required></div>
+                    <button class="btn-violet">CrÃ©er le compte â†’</button>
                 </form>
             </div>
             <p style="text-align:center;margin-top:18px;font-size:.68rem;color:var(--muted);">
-                <a href="#" onclick="document.getElementById('screen-license').classList.remove('dn');document.getElementById('screen-auth').classList.add('dn');return false;" style="color:var(--muted);text-decoration:none;">← Revenir à la vérification de licence</a>
+                <a href="#" onclick="document.getElementById('screen-license').classList.remove('dn');document.getElementById('screen-auth').classList.add('dn');return false;" style="color:var(--muted);text-decoration:none;">â† Revenir Ã  la vÃ©rification de licence</a>
             </p>
         </div>
     </div>
@@ -338,7 +338,7 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
         <div class="sidebar">
             <div class="brand">
                 <div class="brand-icon">K</div>
-                <div><div class="brand-name">KOMMZ VOICE</div><div class="brand-sub">XTTS v2 Engine</div></div>
+                <div><div class="brand-name">KOMMZ VOICE</div><div class="brand-sub">Moteur vocal IA</div></div>
             </div>
             <div class="nav-label" style="margin-bottom:10px;">Studio</div>
             <div id="nav-lab" class="nav-item active" onclick="switchTab('lab')">
@@ -351,7 +351,7 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
             <div class="sidebar-footer">
                 <div class="user-chip">
                     <div class="user-avatar">{{ user.email[0]|upper }}</div>
-                    <div style="flex:1;min-width:0;"><div class="user-email">{{ user.email }}</div><div class="user-status">Authentified ✓</div></div>
+                    <div style="flex:1;min-width:0;"><div class="user-email">{{ user.email }}</div><div class="user-status">Authentified âœ“</div></div>
                     <a href="/logout" class="logout-btn"><i class="bi bi-power"></i></a>
                 </div>
                 <div id="trialStatusCard" class="trial-card dn">
@@ -367,9 +367,9 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
             <div id="view-lab" class="lab-view">
                 <div class="lab-header">
                     <div>
-                        <div class="lab-eyebrow">// Kommz · XTTS v2</div>
+                        <div class="lab-eyebrow">// Kommz Â· moteur vocal IA</div>
                         <div class="lab-title">Voice <span>Lab</span></div>
-                        <div class="lab-sub">Banque d'empreintes vocales · Clonage XTTS v2 via Modal A10G</div>
+                        <div class="lab-sub">Banque d'empreintes vocales Â· Clonage vocal IA via Modal A10G</div>
                     </div>
                     <button class="btn-new" onclick="openWizard()"><i class="bi bi-plus-lg"></i> Nouveau Clone</button>
                 </div>
@@ -379,23 +379,23 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
             <!-- API -->
             <div id="view-api" class="api-view dn">
                 <h1 style="font-size:1.8rem;font-weight:800;letter-spacing:-.04em;margin-bottom:8px;">API Diamond Core</h1>
-                <p style="color:var(--muted-light);margin-bottom:28px;font-size:.88rem;">Connectez vos applications au moteur XTTS v2 via REST.</p>
+                <p style="color:var(--muted-light);margin-bottom:28px;font-size:.88rem;">Connectez vos applications au moteur vocal IA via REST.</p>
                 <div class="api-card">
-                    <div class="api-card-title">Votre clé d'accès privée</div>
-                    <p style="font-size:.78rem;color:var(--muted);margin-bottom:0;">Ne jamais partager cette clé.</p>
+                    <div class="api-card-title">Votre clÃ© d'accÃ¨s privÃ©e</div>
+                    <p style="font-size:.78rem;color:var(--muted);margin-bottom:0;">Ne jamais partager cette clÃ©.</p>
                     <div class="api-key-row">
                         <input type="text" id="userApiKey" class="api-key-input" value="{{ user.api_key }}" readonly>
                         <button class="api-copy-btn" onclick="copyApiKey()">Copier</button>
                     </div>
                 </div>
                 <div class="api-card">
-                    <div style="font-size:.95rem;font-weight:700;margin-bottom:8px;">Documentation d'inférence</div>
-                    <p style="font-size:.78rem;color:var(--muted-light);margin-bottom:0;">Endpoint POST pour générer de l'audio :</p>
+                    <div style="font-size:.95rem;font-weight:700;margin-bottom:8px;">Documentation d'infÃ©rence</div>
+                    <p style="font-size:.78rem;color:var(--muted-light);margin-bottom:0;">Endpoint POST pour gÃ©nÃ©rer de l'audio :</p>
                     <div class="code-block"><pre>curl -X POST https://votre-domaine-render.com/v1/synthesis \
   -H "Authorization: Bearer {{ user.api_key }}" \
   -H "Content-Type: application/json" \
   -d '{
-    "text": "Le message à synthétiser...",
+    "text": "Le message Ã  synthÃ©tiser...",
     "voice_id": "votre_id_de_voix",
     "speed": 1.0,
     "temperature": 0.7,
@@ -409,9 +409,9 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
     <!-- CONTEXT MENU -->
     <div id="ctxMenu" class="ctx-menu">
         <div class="ctx-item" onclick="app.copyId()"><i class="bi bi-clipboard2-data"></i> Copier l'ID</div>
-        <div class="ctx-item" onclick="app.previewCtx()"><i class="bi bi-play-circle"></i> Écouter</div>
+        <div class="ctx-item" onclick="app.previewCtx()"><i class="bi bi-play-circle"></i> Ã‰couter</div>
         <div class="ctx-div"></div>
-        <div class="ctx-item danger" onclick="app.deleteVoice()"><i class="bi bi-trash3"></i> Révoquer</div>
+        <div class="ctx-item danger" onclick="app.deleteVoice()"><i class="bi bi-trash3"></i> RÃ©voquer</div>
     </div>
 
     <!-- WIZARD MODAL -->
@@ -431,7 +431,7 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
                     </div>
                     <div class="wiz-spec">
                         <div class="wiz-spec-label">Output Format</div>
-                        <div class="wiz-spec-val">24kHz · 16-bit</div>
+                        <div class="wiz-spec-val">24kHz Â· 16-bit</div>
                     </div>
                 </div>
 
@@ -449,9 +449,9 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
                              onclick="document.getElementById('audioFile').click()"
                              ondragover="doDragOver(event)" ondragleave="doDragLeave(event)" ondrop="doDrop(event)">
                             <div class="upload-icon"><i class="bi bi-cloud-arrow-up-fill"></i></div>
-                            <div class="upload-title">Flux d'entrée vocal — XTTS v2</div>
-                            <div class="upload-sub">Injectez 10 à 90 secondes de votre voix pour le clonage optimal</div>
-                            <div class="upload-fmt">WAV · MP3 · FLAC · M4A · WEBM — Max 32MB</div>
+                            <div class="upload-title">Flux d'entrÃ©e vocal â€” moteur vocal IA</div>
+                            <div class="upload-sub">Injectez 10 Ã  90 secondes de votre voix pour le clonage optimal</div>
+                            <div class="upload-fmt">WAV Â· MP3 Â· FLAC Â· M4A Â· WEBM â€” Max 32MB</div>
                             <div class="upload-actions" onclick="event.stopPropagation()">
                                 <div class="ubtn ubtn-file" onclick="document.getElementById('audioFile').click()"><i class="bi bi-folder2-open"></i> Parcourir</div>
                                 <div class="ubtn ubtn-mic" id="micBtn" onclick="app.toggleMic()">
@@ -459,20 +459,20 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
                                     <span id="micLabel">Microphone</span>
                                 </div>
                             </div>
-                            <div class="mic-timer" id="micTimer">⏺ 00:00 — Capture en cours</div>
+                            <div class="mic-timer" id="micTimer">âº 00:00 â€” Capture en cours</div>
                         </div>
 
                         <div class="file-loaded" id="fileLoaded">
                             <div class="file-icon"><i class="bi bi-music-note-list"></i></div>
                             <div style="flex:1;min-width:0;">
                                 <div class="file-name" id="fileName">audio.wav</div>
-                                <div class="file-ok">Prêt · XTTS v2 Clone Engine</div>
+                                <div class="file-ok">PrÃªt Â· moteur vocal IA</div>
                             </div>
                         </div>
 
                         <div class="dur-section" id="durSection">
                             <div class="dur-header">
-                                <span class="dur-label">Durée détectée</span>
+                                <span class="dur-label">DurÃ©e dÃ©tectÃ©e</span>
                                 <span class="dur-value" id="durVal">0s</span>
                             </div>
                             <div class="dur-track">
@@ -483,7 +483,7 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
                             </div>
                         </div>
 
-                        <!-- WHISPER : analyse texte de référence -->
+                        <!-- WHISPER : analyse texte de rÃ©fÃ©rence -->
                         <div class="whisper-row" id="whisperRow">
                             <select id="whisperModel" class="whisper-model">
                                 <option value="small">Whisper Small</option>
@@ -496,7 +496,7 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
                         </div>
 
                         <div style="margin-top:24px;display:flex;justify-content:flex-end;padding-top:20px;border-top:1px solid var(--border);">
-                            <button class="btn-new" onclick="goStep(2)">Étape suivante <i class="bi bi-arrow-right ms-1"></i></button>
+                            <button class="btn-new" onclick="goStep(2)">Ã‰tape suivante <i class="bi bi-arrow-right ms-1"></i></button>
                         </div>
                     </div>
 
@@ -513,16 +513,16 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
                                 <span class="section-label" style="margin-top:0;">Nom de l'empreinte</span>
                                 <input type="text" id="profileName" class="kommz-input" placeholder="ex: Narrateur Studio #01" style="margin-bottom:14px;">
                                 <span class="section-label">Description (facultatif)</span>
-                                <textarea id="profileDesc" class="kommz-input" rows="4" style="resize:none;margin-bottom:14px;" placeholder="Usage prévu : Narration, Gaming, Podcast..."></textarea>
+                                <textarea id="profileDesc" class="kommz-input" rows="4" style="resize:none;margin-bottom:14px;" placeholder="Usage prÃ©vu : Narration, Gaming, Podcast..."></textarea>
                                 <span class="section-label">Genre</span>
                                 <div class="pill-group" style="margin-bottom:14px;">
-                                    <div class="pill" onclick="togglePill(this)">Féminin</div>
+                                    <div class="pill" onclick="togglePill(this)">FÃ©minin</div>
                                     <div class="pill" onclick="togglePill(this)">Masculin</div>
                                     <div class="pill" onclick="togglePill(this)">Enfantin</div>
                                     <div class="pill" onclick="togglePill(this)">Neutre</div>
                                     <div class="pill" onclick="togglePill(this)">Robotique / IA</div>
                                 </div>
-                                <span class="section-label">Tranche d'âge</span>
+                                <span class="section-label">Tranche d'Ã¢ge</span>
                                 <div class="pill-group" style="margin-bottom:14px;">
                                     <div class="pill" onclick="togglePill(this)">Enfant</div>
                                     <div class="pill" onclick="togglePill(this)">Adolescent</div>
@@ -530,16 +530,16 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
                                     <div class="pill" onclick="togglePill(this)">Adulte</div>
                                     <div class="pill" onclick="togglePill(this)">Senior</div>
                                 </div>
-                                <span class="section-label">Visibilité</span>
+                                <span class="section-label">VisibilitÃ©</span>
                                 <div class="vis-row">
                                     <div class="vis-opt on" onclick="setVis(this,'public')">Public</div>
-                                    <div class="vis-opt" onclick="setVis(this,'private')">Privé</div>
+                                    <div class="vis-opt" onclick="setVis(this,'private')">PrivÃ©</div>
                                 </div>
                             </div>
                             <div class="col-lg-6">
-                                <span class="section-label" style="margin-top:0;">Qualités vocales</span>
+                                <span class="section-label" style="margin-top:0;">QualitÃ©s vocales</span>
                                 <div class="pill-group" style="max-height:400px;overflow-y:auto;background:var(--bg-input);padding:18px;border-radius:12px;border:1px solid var(--border);">
-                                    <div class="pill" onclick="togglePill(this)">Profond</div><div class="pill" onclick="togglePill(this)">Cristallin</div><div class="pill" onclick="togglePill(this)">Dynamique</div><div class="pill" onclick="togglePill(this)">Sombre</div><div class="pill" onclick="togglePill(this)">Enroué</div><div class="pill" onclick="togglePill(this)">Chaud</div><div class="pill" onclick="togglePill(this)">Froid</div><div class="pill" onclick="togglePill(this)">Monotone</div><div class="pill" onclick="togglePill(this)">Confiant</div><div class="pill" onclick="togglePill(this)">Posé</div><div class="pill" onclick="togglePill(this)">Autoritaire</div><div class="pill" onclick="togglePill(this)">Mystérieux</div><div class="pill" onclick="togglePill(this)">Narration</div><div class="pill" onclick="togglePill(this)">Doublage</div><div class="pill" onclick="togglePill(this)">Cinématique</div><div class="pill" onclick="togglePill(this)">Sportif</div><div class="pill" onclick="togglePill(this)">Podcast</div><div class="pill" onclick="togglePill(this)">News / TV</div><div class="pill" onclick="togglePill(this)">Dramatique</div><div class="pill" onclick="togglePill(this)">Intime</div><div class="pill" onclick="togglePill(this)">Menaçant</div><div class="pill" onclick="togglePill(this)">Rugueux</div><div class="pill" onclick="togglePill(this)">Puissant</div><div class="pill" onclick="togglePill(this)">Fragile</div><div class="pill" onclick="togglePill(this)">Velouté</div><div class="pill" onclick="togglePill(this)">Énergique</div><div class="pill" onclick="togglePill(this)">Naturel</div><div class="pill" onclick="togglePill(this)">Amical</div><div class="pill" onclick="togglePill(this)">Vocal fry</div><div class="pill" onclick="togglePill(this)">Accent FR-Sud</div><div class="pill" onclick="togglePill(this)">Accent Québec</div>
+                                    <div class="pill" onclick="togglePill(this)">Profond</div><div class="pill" onclick="togglePill(this)">Cristallin</div><div class="pill" onclick="togglePill(this)">Dynamique</div><div class="pill" onclick="togglePill(this)">Sombre</div><div class="pill" onclick="togglePill(this)">EnrouÃ©</div><div class="pill" onclick="togglePill(this)">Chaud</div><div class="pill" onclick="togglePill(this)">Froid</div><div class="pill" onclick="togglePill(this)">Monotone</div><div class="pill" onclick="togglePill(this)">Confiant</div><div class="pill" onclick="togglePill(this)">PosÃ©</div><div class="pill" onclick="togglePill(this)">Autoritaire</div><div class="pill" onclick="togglePill(this)">MystÃ©rieux</div><div class="pill" onclick="togglePill(this)">Narration</div><div class="pill" onclick="togglePill(this)">Doublage</div><div class="pill" onclick="togglePill(this)">CinÃ©matique</div><div class="pill" onclick="togglePill(this)">Sportif</div><div class="pill" onclick="togglePill(this)">Podcast</div><div class="pill" onclick="togglePill(this)">News / TV</div><div class="pill" onclick="togglePill(this)">Dramatique</div><div class="pill" onclick="togglePill(this)">Intime</div><div class="pill" onclick="togglePill(this)">MenaÃ§ant</div><div class="pill" onclick="togglePill(this)">Rugueux</div><div class="pill" onclick="togglePill(this)">Puissant</div><div class="pill" onclick="togglePill(this)">Fragile</div><div class="pill" onclick="togglePill(this)">VeloutÃ©</div><div class="pill" onclick="togglePill(this)">Ã‰nergique</div><div class="pill" onclick="togglePill(this)">Naturel</div><div class="pill" onclick="togglePill(this)">Amical</div><div class="pill" onclick="togglePill(this)">Vocal fry</div><div class="pill" onclick="togglePill(this)">Accent FR-Sud</div><div class="pill" onclick="togglePill(this)">Accent QuÃ©bec</div>
                                 </div>
                             </div>
                         </div>
@@ -548,7 +548,7 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
                         <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
                             <div style="display:flex;align-items:flex-start;gap:10px;">
                                 <input type="checkbox" class="tos-check" id="tosCheck">
-                                <label for="tosCheck" class="tos-label">J'assume l'originalité du clone et détiens tous les droits d'exploitation légaux.</label>
+                                <label for="tosCheck" class="tos-label">J'assume l'originalitÃ© du clone et dÃ©tiens tous les droits d'exploitation lÃ©gaux.</label>
                             </div>
                             <button class="btn-save" id="btnSave" onclick="app.saveProfile()">
                                 <i class="bi bi-fingerprint me-1"></i> Enregistrer le clone
@@ -624,15 +624,15 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
         const key = input ? input.value.trim() : '';
 
         if (!key) {
-            errBox.textContent = '⚠️ Entrez votre clé de licence (format VCV-...)';
+            errBox.textContent = 'âš ï¸ Entrez votre clÃ© de licence (format VCV-...)';
             return;
         }
         if (!key.startsWith('VCV-') && !['VTP-VOICE-ADMIN','NICOLAS-VOICE-PRO'].includes(key)) {
-            errBox.textContent = '❌ Format invalide — la clé doit commencer par VCV-';
+            errBox.textContent = 'âŒ Format invalide â€” la clÃ© doit commencer par VCV-';
             return;
         }
 
-        btn.textContent = '⏳ Vérification...';
+        btn.textContent = 'â³ VÃ©rification...';
         btn.disabled = true;
         errBox.textContent = '';
 
@@ -645,24 +645,24 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
             const d = await r.json();
 
             if (!d.valid) {
-                errBox.textContent = '❌ ' + (d.error || 'Clé invalide ou expirée');
+                errBox.textContent = 'âŒ ' + (d.error || 'ClÃ© invalide ou expirÃ©e');
                 return;
             }
 
-            // Clé valide ✓
+            // ClÃ© valide âœ“
             _trialMode = false;
             _verifiedLicenseKey = key;
             document.getElementById('screen-license').classList.add('dn');
             document.getElementById('screen-auth').classList.remove('dn');
 
-            // Si déjà liée à un compte → afficher connexion avec l'email pré-rempli
+            // Si dÃ©jÃ  liÃ©e Ã  un compte â†’ afficher connexion avec l'email prÃ©-rempli
             if (d.already_used && d.email) {
                 switchAuthTab('login');
                 const loginEmail = document.getElementById('loginEmail');
                 if (loginEmail) loginEmail.value = d.email;
                 errBox.textContent = '';
             } else {
-                // Nouvelle clé → afficher inscription
+                // Nouvelle clÃ© â†’ afficher inscription
                 switchAuthTab('register');
                 const hiddenKey = document.getElementById('hiddenLicenseKey');
                 if (hiddenKey) hiddenKey.value = key;
@@ -678,7 +678,7 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
 
         } catch(e) {
             // Si la route n'existe pas encore (dev sans Flask), laisser passer
-            errBox.textContent = '⚠️ Service de vérification indisponible — accès direct.';
+            errBox.textContent = 'âš ï¸ Service de vÃ©rification indisponible â€” accÃ¨s direct.';
             setTimeout(() => {
                 _verifiedLicenseKey = key;
                 document.getElementById('screen-license').classList.add('dn');
@@ -686,13 +686,13 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
                 switchAuthTab('register');
             }, 1500);
         } finally {
-            btn.textContent = 'Vérifier la licence →';
+            btn.textContent = 'VÃ©rifier la licence â†’';
             btn.disabled = false;
         }
     }
 
     function showLoginOnly() {
-        // Client avec un compte existant, pas besoin de vérifier la licence
+        // Client avec un compte existant, pas besoin de vÃ©rifier la licence
         _trialMode = false;
         document.getElementById('screen-license').classList.add('dn');
         document.getElementById('screen-auth').classList.remove('dn');
@@ -722,8 +722,8 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
             }
             const r=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
             const res=await r.json();
-            if(res.success){window.location.assign('/');}else{btn.disabled=false;btn.textContent=url==='/login'?'Initialiser →':'Créer →';showToast('Erreur',res.error||'Auth échouée','error');}
-        }catch(ex){btn.disabled=false;btn.textContent='Réessayer →';}
+            if(res.success){window.location.assign('/');}else{btn.disabled=false;btn.textContent=url==='/login'?'Initialiser â†’':'CrÃ©er â†’';showToast('Erreur',res.error||'Auth Ã©chouÃ©e','error');}
+        }catch(ex){btn.disabled=false;btn.textContent='RÃ©essayer â†’';}
     }
 
     /* === NAV === */
@@ -736,7 +736,13 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
     }
 
     /* === WIZARD === */
-    function openWizard(){window.app?.resetWizard();goStep(1);new bootstrap.Modal(document.getElementById('wizModal')).show();}
+    function openWizard(){
+        window.app?.resetWizard();
+        goStep(1);
+        new bootstrap.Modal(document.getElementById('wizModal')).show();
+        // Pre-warm moteur vocal in background to reduce first-generation latency.
+        fetch('/api/xtts/warmup', {method:'POST'}).catch(()=>{});
+    }
     function goStep(n){
         [1,2].forEach(i=>{
             document.getElementById('wiz-step-'+i).classList.toggle('dn',i!==n);
@@ -759,7 +765,7 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
     function doDrop(e){e.preventDefault();doDragLeave();const f=e.dataTransfer.files[0];if(f)window.app?.uploadFile(f);}
 
     /* === API === */
-    function copyApiKey(){const v=document.getElementById('userApiKey')?.value;if(v){navigator.clipboard.writeText(v);showToast('Système','Clé API copiée.','success');}}
+    function copyApiKey(){const v=document.getElementById('userApiKey')?.value;if(v){navigator.clipboard.writeText(v);showToast('SystÃ¨me','ClÃ© API copiÃ©e.','success');}}
 
     /* === TOAST === */
     function showToast(title,msg,type='info'){
@@ -808,8 +814,8 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
             const secPart = String(sec%60).padStart(2,'0');
             const genLeft = Number(d.remaining_generations||0);
             const phr = d.remaining_phrases||{};
-            main.textContent = d.active ? `${min}m ${secPart}s restants` : 'Essai terminé';
-            sub.textContent = `Générations: ${genLeft} · Phrases ≈ C:${phr.courtes||0} M:${phr.moyennes||0} L:${phr.longues||0}`;
+            main.textContent = d.active ? `${min}m ${secPart}s restants` : 'Essai terminÃ©';
+            sub.textContent = `GÃ©nÃ©rations: ${genLeft} Â· Phrases â‰ˆ C:${phr.courtes||0} M:${phr.moyennes||0} L:${phr.longues||0}`;
         }
 
         /* PROFILES */
@@ -820,7 +826,7 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
         renderGrid(){
             const grid=document.getElementById('voiceGrid');if(!grid)return;
             if(!this.profiles.length){
-                grid.innerHTML=`<div class="empty-state"><div class="empty-icon"><i class="bi bi-person-bounding-box"></i></div><div class="empty-title">Aucune empreinte vocale</div><div class="empty-sub">Créez votre premier clone XTTS v2 pour démarrer.</div></div>`;
+                grid.innerHTML=`<div class="empty-state"><div class="empty-icon"><i class="bi bi-person-bounding-box"></i></div><div class="empty-title">Aucune empreinte vocale</div><div class="empty-sub">CrÃ©ez votre premier clone moteur vocal IA pour dÃ©marrer.</div></div>`;
                 return;
             }
             grid.innerHTML=this.profiles.map(p=>{
@@ -848,10 +854,10 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
             try{
                 const r=await fetch('/api/upload-reference',{method:'POST',body:fd});
                 const d=await r.json();
-                if(!r.ok)throw new Error(d.error||'Upload échoué');
+                if(!r.ok)throw new Error(d.error||'Upload Ã©chouÃ©');
                 this.fileId=d.file_id;
                 this.showFileLoaded(file.name);
-                showToast('Upload','Fichier prêt pour le clonage.','success');
+                showToast('Upload','Fichier prÃªt pour le clonage.','success');
             }catch(e){showToast('Erreur',e.message,'error');}
         }
         showFileLoaded(name){
@@ -871,9 +877,9 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
             document.getElementById('whisperIcon').className='bi bi-magic';
         }
 
-        /* WHISPER — BUG FIX */
+        /* WHISPER â€” BUG FIX */
         async runWhisper(){
-            if(!this.fileId){showToast('Whisper','Aucun fichier chargé.','warning');return;}
+            if(!this.fileId){showToast('Whisper','Aucun fichier chargÃ©.','warning');return;}
             const btn=document.getElementById('whisperBtn'),lbl=document.getElementById('whisperLabel'),ico=document.getElementById('whisperIcon');
             btn.disabled=true;lbl.textContent='Analyse en cours...';ico.className='bi bi-arrow-repeat';
             try{
@@ -883,19 +889,19 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
                     headers:{'Content-Type':'application/json'},
                     body:JSON.stringify({model})
                 });
-                // FIX : parse body UNE SEULE fois avant de vérifier r.ok
+                // FIX : parse body UNE SEULE fois avant de vÃ©rifier r.ok
                 let data;
                 try{data=await r.json();}
-                catch(parseErr){throw new Error(`Réponse invalide du serveur (HTTP ${r.status})`);}
+                catch(parseErr){throw new Error(`RÃ©ponse invalide du serveur (HTTP ${r.status})`);}
                 if(!r.ok)throw new Error(data?.error||data?.message||`Erreur serveur HTTP ${r.status}`);
                 const text=data.text||data.transcript||'';
-                if(!text)throw new Error('Transcription vide — vérifiez le fichier audio.');
+                if(!text)throw new Error('Transcription vide â€” vÃ©rifiez le fichier audio.');
                 document.getElementById('referenceText').value=text;
-                lbl.textContent='Analyse terminée ✓';ico.className='bi bi-check-circle-fill';btn.classList.add('done');
-                showToast('Whisper','Texte de référence extrait avec succès.','success');
+                lbl.textContent='Analyse terminÃ©e âœ“';ico.className='bi bi-check-circle-fill';btn.classList.add('done');
+                showToast('Whisper','Texte de rÃ©fÃ©rence extrait avec succÃ¨s.','success');
             }catch(e){
                 showToast('Whisper',e.message,'error');
-                lbl.textContent='Réessayer';ico.className='bi bi-magic';btn.classList.remove('done');
+                lbl.textContent='RÃ©essayer';ico.className='bi bi-magic';btn.classList.remove('done');
             }finally{btn.disabled=false;}
         }
 
@@ -919,9 +925,9 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
                 this.micInterval=setInterval(()=>{
                     this.micSec++;
                     const m=String(Math.floor(this.micSec/60)).padStart(2,'0'),s=String(this.micSec%60).padStart(2,'0');
-                    document.getElementById('micTimer').textContent=`⏺ ${m}:${s} — Capture en cours`;
+                    document.getElementById('micTimer').textContent=`âº ${m}:${s} â€” Capture en cours`;
                 },1000);
-            }catch(e){showToast('Micro','Accès refusé.','error');}
+            }catch(e){showToast('Micro','AccÃ¨s refusÃ©.','error');}
         }
         stopMic(){
             if(this.mediaRecorder)this.mediaRecorder.stop();
@@ -945,7 +951,7 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
             try{
                 const r=await fetch('/api/profiles',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
                 const d=await r.json();
-                if(d.success){showToast('Succès',`Clone "${name}" enregistré.`,'success');bootstrap.Modal.getInstance(document.getElementById('wizModal')).hide();this.loadProfiles();}
+                if(d.success){showToast('SuccÃ¨s',`Clone "${name}" enregistrÃ©.`,'success');bootstrap.Modal.getInstance(document.getElementById('wizModal')).hide();this.loadProfiles();}
                 else throw new Error(d.error||'Erreur inconnue');
             }catch(e){showToast('Erreur',e.message,'error');}
             finally{btn.disabled=false;btn.innerHTML='<i class="bi bi-fingerprint me-1"></i> Enregistrer le clone';}
@@ -954,12 +960,12 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
         /* CONTEXT MENU */
         openCtx(e,id){e.preventDefault();e.stopPropagation();this.ctxId=id;const m=document.getElementById('ctxMenu');m.style.display='block';let x=e.pageX,y=e.pageY;if(x+210>window.innerWidth)x-=200;if(y+140>window.innerHeight)y-=130;m.style.left=x+'px';m.style.top=y+'px';}
         hideCtx(){document.getElementById('ctxMenu').style.display='none';}
-        copyId(){if(this.ctxId){navigator.clipboard.writeText(this.ctxId);showToast('Copié','ID dans le presse-papier.','success');}}
+        copyId(){if(this.ctxId){navigator.clipboard.writeText(this.ctxId);showToast('CopiÃ©','ID dans le presse-papier.','success');}}
         previewCtx(){const p=this.profiles.find(x=>x.id===this.ctxId);if(p)this.togglePreview(p.audio_url||'',p.id);}
         async deleteVoice(){
-            if(!this.ctxId)return;if(!confirm('Révoquer définitivement cette empreinte ?'))return;
-            try{const r=await fetch(`/api/voices/delete/${this.ctxId}`,{method:'DELETE'});const d=await r.json();if(d.success){showToast('Révoqué','Empreinte supprimée.','success');this.loadProfiles();}else throw new Error(d.error);}
-            catch(e){showToast('Erreur','Suppression échouée.','error');}
+            if(!this.ctxId)return;if(!confirm('RÃ©voquer dÃ©finitivement cette empreinte ?'))return;
+            try{const r=await fetch(`/api/voices/delete/${this.ctxId}`,{method:'DELETE'});const d=await r.json();if(d.success){showToast('RÃ©voquÃ©','Empreinte supprimÃ©e.','success');this.loadProfiles();}else throw new Error(d.error);}
+            catch(e){showToast('Erreur','Suppression Ã©chouÃ©e.','error');}
         }
 
         /* PREVIEW AUDIO */
@@ -999,7 +1005,7 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
     }
 
     document.addEventListener('DOMContentLoaded', async () => {
-        // Init uniquement les handlers correspondant à la vue rendue par Jinja.
+        // Init uniquement les handlers correspondant Ã  la vue rendue par Jinja.
         const hasDashboard = !!document.getElementById('voiceGrid');
         const hasAuthFlow = !!document.getElementById('screen-license');
         if (hasDashboard || hasAuthFlow) window.app = new KommzApp();
@@ -1007,3 +1013,5 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
     </script>
 </body>
 </html>
+
+

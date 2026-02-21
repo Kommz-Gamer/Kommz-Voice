@@ -97,6 +97,11 @@ TRIAL_WINDOW_HOURS = int(os.environ.get("TRIAL_WINDOW_HOURS", "24"))
 TRIAL_MAX_AUDIO_SECONDS = int(os.environ.get("TRIAL_MAX_AUDIO_SECONDS", "1800"))  # 30 min
 TRIAL_MAX_GENERATIONS = int(os.environ.get("TRIAL_MAX_GENERATIONS", "120"))
 
+# Desktop update channel (Kommz Gamer)
+DESKTOP_STABLE_VERSION = os.environ.get("DESKTOP_STABLE_VERSION", "4.1").strip()
+DESKTOP_DOWNLOAD_URL = os.environ.get("DESKTOP_DOWNLOAD_URL", "").strip()
+DESKTOP_CHANGELOG_URL = os.environ.get("DESKTOP_CHANGELOG_URL", "").strip()
+
 
 def _jwt_payload(token: str) -> dict:
     """Decode unverified JWT payload (best effort)."""
@@ -1672,6 +1677,50 @@ def health():
         "status":  "ok",
         "version": "1.0.0",
         "service": "Kommz Voice Web Server",
+    })
+
+
+def _parse_version_tuple(version_text: str) -> tuple:
+    """Convertit '4.2.1' en tuple comparable (4, 2, 1)."""
+    raw = (version_text or "").strip()
+    if not raw:
+        return tuple()
+    parts = []
+    for p in raw.split("."):
+        num = "".join(ch for ch in p if ch.isdigit())
+        if not num:
+            break
+        parts.append(int(num))
+    return tuple(parts)
+
+
+@app.route("/update/check-desktop", methods=["GET"])
+def update_check_desktop():
+    """
+    Endpoint de check update pour le logiciel desktop.
+    Ex: GET /update/check-desktop?current=4.1&channel=stable
+    """
+    current = (request.args.get("current") or "").strip()
+    channel = (request.args.get("channel") or "stable").strip().lower()
+    platform = (request.args.get("platform") or "windows").strip().lower()
+
+    latest = DESKTOP_STABLE_VERSION
+    current_t = _parse_version_tuple(current)
+    latest_t = _parse_version_tuple(latest)
+    update_available = bool(latest_t and current_t and latest_t > current_t)
+    if not current_t and latest_t:
+        update_available = True
+
+    return jsonify({
+        "ok": True,
+        "channel": channel,
+        "platform": platform,
+        "current_version": current,
+        "latest_version": latest,
+        "update_available": update_available,
+        "download_url": DESKTOP_DOWNLOAD_URL,
+        "changelog_url": DESKTOP_CHANGELOG_URL,
+        "message": f"Nouvelle version disponible: {latest}" if update_available else "Vous êtes à jour.",
     })
 
 
