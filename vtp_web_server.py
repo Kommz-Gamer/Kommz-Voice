@@ -50,6 +50,7 @@ import tempfile
 import base64
 import json as pyjson
 import requests
+import threading
 from datetime import datetime, timedelta
 from functools import wraps
 
@@ -82,6 +83,7 @@ MODAL_XTTS_URL = os.environ.get(
     "MODAL_XTTS_URL",
     "https://your-app--kommz-voice-xtts.modal.run",
 ).strip().rstrip("/")
+MODAL_XTTS_WARMUP_URL = os.environ.get("MODAL_XTTS_WARMUP_URL", "").strip().rstrip("/")
 
 # Secrets
 SECRET_KEY = os.environ.get("SECRET_KEY", "").strip()
@@ -158,6 +160,8 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 # Bucket Supabase Storage pour les fichiers audio
 STORAGE_BUCKET = "voice-references"
 _storage_bucket_checked = False
+_last_xtts_warmup_ts = 0.0
+_xtts_warmup_lock = threading.Lock()
 
 
 def ensure_storage_bucket() -> None:
@@ -269,6 +273,45 @@ def _estimate_audio_seconds(text: str, speed: float = 1.0) -> int:
     safe_speed = max(0.5, min(2.0, float(speed or 1.0)))
     cps = 14.0 * safe_speed
     return max(1, int(round(len(text) / cps)))
+
+
+def _get_xtts_warmup_url() -> str:
+    if MODAL_XTTS_WARMUP_URL:
+        return MODAL_XTTS_WARMUP_URL
+    return f"{MODAL_XTTS_URL}/warmup"
+
+
+def prewarm_xtts_async(force: bool = False, cooldown_seconds: int = 90) -> None:
+    """Pré-réveille XTTS sans bloquer la requête utilisateur."""
+    global _last_xtts_warmup_ts
+    now = time.time()
+    if not force and (now - _last_xtts_warmup_ts) < cooldown_seconds:
+        return
+
+    def _runner():
+        global _last_xtts_warmup_ts
+        try:
+            with _xtts_warmup_lock:
+                now2 = time.time()
+                if not force and (now2 - _last_xtts_warmup_ts) < cooldown_seconds:
+                    return
+                warmup_url = _get_xtts_warmup_url()
+                ok = False
+                try:
+                    r = requests.post(warmup_url, timeout=(4, 20))
+                    ok = r.ok
+                except Exception:
+                    pass
+                if not ok:
+                    try:
+                        requests.get(f"{MODAL_XTTS_URL}/health", timeout=(4, 10))
+                    except Exception:
+                        pass
+                _last_xtts_warmup_ts = time.time()
+        except Exception:
+            pass
+
+    threading.Thread(target=_runner, daemon=True).start()
 
 
 def _get_trial_status_for_user(user: dict) -> dict:
@@ -398,6 +441,34 @@ def verify_vtp_key(key: str) -> dict:
     return {"valid": True, "expired": expired, "expiration_ts": expiration_ts}
 
 
+def verify_trial_desktop_key(key: str) -> dict:
+    """
+    Vérifie une clé TRIAL-{timestamp_expiration}-{random4}-{sig8}
+    utilisée pour l'essai desktop.
+    """
+    parts = key.split("-")
+    if len(parts) != 4 or parts[0] != "TRIAL":
+        return {"valid": False, "expired": False, "expiration_ts": 0}
+
+    try:
+        ts_str, rand, sig = parts[1], parts[2], parts[3]
+        expiration_ts = int(ts_str)
+    except (ValueError, IndexError):
+        return {"valid": False, "expired": False, "expiration_ts": 0}
+
+    sig_upper = sig.upper()
+    expected_ts_rand_salt = hashlib.sha256(f"{ts_str}{rand}{DESKTOP_SECRET_SALT}".encode()).hexdigest()[:8].upper()
+    expected_salt_ts_rand = hashlib.sha256(f"{DESKTOP_SECRET_SALT}{ts_str}{rand}".encode()).hexdigest()[:8].upper()
+    if not (
+        hmac.compare_digest(sig_upper, expected_ts_rand_salt)
+        or hmac.compare_digest(sig_upper, expected_salt_ts_rand)
+    ):
+        return {"valid": False, "expired": False, "expiration_ts": 0}
+
+    expired = expiration_ts < int(time.time())
+    return {"valid": True, "expired": expired, "expiration_ts": expiration_ts}
+
+
 # =============================================================================
 # ROUTES STATIQUES ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Sert index.html
 # =============================================================================
@@ -406,6 +477,8 @@ def verify_vtp_key(key: str) -> dict:
 def index():
     """Sert l'application principale."""
     user = get_current_user()
+    if user:
+        prewarm_xtts_async(force=False, cooldown_seconds=120)
     # On passe le user au template Jinja si besoin
     # Pour une SPA pure, on peut retourner juste le fichier statique
     try:
@@ -738,6 +811,13 @@ def trial_status():
     })
 
 
+@app.route("/api/xtts/warmup", methods=["POST"])
+@login_required
+def xtts_warmup():
+    prewarm_xtts_async(force=True, cooldown_seconds=10)
+    return jsonify({"success": True, "message": "XTTS warmup lancé"})
+
+
 # =============================================================================
 # ROUTE LICENCE ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â VÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rification avant inscription (appelÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©e depuis index.html)
 # =============================================================================
@@ -869,6 +949,115 @@ def activate_desktop_gamer_license():
 @app.route("/license/voice/activate-desktop", methods=["POST"])
 def activate_desktop_voice_license():
     return _activate_desktop_license_common("voice")
+
+
+@app.route("/license/trial/activate-desktop", methods=["POST"])
+def activate_desktop_trial_license():
+    """
+    Active (ou revalide) un essai desktop 24h.
+    Règles anti-abus:
+    - 1 essai par email
+    - 1 essai par HWID
+    - même couple email+HWID: revalidation autorisée
+    """
+    data = request.get_json() or {}
+    key = (data.get("license_key") or "").strip().upper()
+    email = (data.get("email") or "").strip().lower()
+    hwid = (data.get("hwid") or "").strip().upper()
+
+    if not email or "@" not in email or not hwid:
+        return jsonify({"ok": False, "error": "Paramètres manquants"}), 400
+
+    def _hwid_list(raw: str) -> list[str]:
+        return [h.strip().upper() for h in (raw or "").split(",") if h.strip()]
+
+    try:
+        rows_resp = (
+            supabase.table("license_keys")
+            .select("*")
+            .eq("product", "trial_desktop")
+            .execute()
+        )
+        rows = rows_resp.data or []
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"Erreur DB: {e}"}), 500
+
+    # Revalidation d'une clé trial existante (au redémarrage du logiciel)
+    if key:
+        chk = verify_trial_desktop_key(key)
+        if not chk["valid"] or chk["expired"]:
+            return jsonify({"ok": False, "error": "Clé essai invalide ou expirée"}), 403
+
+        for row in rows:
+            if (row.get("key_value") or "").strip().upper() != key:
+                continue
+            row_email = (row.get("activated_by_email") or "").strip().lower()
+            row_hwids = _hwid_list((row.get("desktop_hwid") or "").strip())
+            if row_email != email:
+                return jsonify({"ok": False, "error": "Essai associé à un autre email"}), 409
+            if hwid not in row_hwids:
+                return jsonify({"ok": False, "error": "Essai associé à un autre appareil"}), 409
+            expiration = row.get("expiration") or datetime.utcfromtimestamp(chk["expiration_ts"]).strftime("%d/%m/%Y")
+            return jsonify({
+                "ok": True,
+                "trial": True,
+                "license_key": key,
+                "voice_license_key": key,
+                "expiration": expiration,
+            })
+        return jsonify({"ok": False, "error": "Essai introuvable"}), 404
+
+    # Création d'un nouvel essai
+    for row in rows:
+        row_email = (row.get("activated_by_email") or "").strip().lower()
+        row_hwids = _hwid_list((row.get("desktop_hwid") or "").strip())
+        row_key = (row.get("key_value") or "").strip().upper()
+        row_exp = (row.get("expiration") or "").strip()
+
+        # Même couple => renvoyer la même clé (réinstallation)
+        if row_email == email and hwid in row_hwids and row_key:
+            chk = verify_trial_desktop_key(row_key)
+            if chk["valid"] and not chk["expired"]:
+                return jsonify({
+                    "ok": True,
+                    "trial": True,
+                    "license_key": row_key,
+                    "voice_license_key": row_key,
+                    "expiration": row_exp or datetime.utcfromtimestamp(chk["expiration_ts"]).strftime("%d/%m/%Y"),
+                })
+
+        # Anti-abus strict
+        if row_email == email:
+            return jsonify({"ok": False, "error": "Essai déjà utilisé avec cet email"}), 409
+        if hwid in row_hwids:
+            return jsonify({"ok": False, "error": "Essai déjà utilisé sur cet appareil"}), 409
+
+    expiration_ts = int(time.time()) + 24 * 3600
+    rand = uuid.uuid4().hex[:4].upper()
+    sig = hashlib.sha256(f"{expiration_ts}{rand}{DESKTOP_SECRET_SALT}".encode()).hexdigest()[:8].upper()
+    trial_key = f"TRIAL-{expiration_ts}-{rand}-{sig}"
+    expiration_date = datetime.utcfromtimestamp(expiration_ts).strftime("%d/%m/%Y")
+
+    try:
+        supabase.table("license_keys").upsert({
+            "key_value": trial_key,
+            "product": "trial_desktop",
+            "is_activated": True,
+            "activated_by_email": email,
+            "desktop_hwid": hwid,
+            "expiration": expiration_date,
+            "activated_at": datetime.utcnow().isoformat(),
+        }, on_conflict="key_value").execute()
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"Erreur DB: {e}"}), 500
+
+    return jsonify({
+        "ok": True,
+        "trial": True,
+        "license_key": trial_key,
+        "voice_license_key": trial_key,
+        "expiration": expiration_date,
+    })
 
 
 # =============================================================================
@@ -1226,6 +1415,7 @@ def generate_voice():
 
     # Envoi vers Modal XTTS
     try:
+        prewarm_xtts_async(force=False, cooldown_seconds=45)
         xtts_response = requests.post(
             f"{MODAL_XTTS_URL}/clone",
             files={"speaker_wav": (file_id, reference_audio, "audio/wav")},
@@ -1373,6 +1563,7 @@ def api_synthesis():
         return jsonify({"error": f"Audio de rÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©fÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rence introuvable: {e}"}), 404
 
     try:
+        prewarm_xtts_async(force=False, cooldown_seconds=45)
         xtts_response = requests.post(
             f"{MODAL_XTTS_URL}/clone",
             files={"speaker_wav": (profile.get("file_id", "ref.wav"), reference_audio, "audio/wav")},
