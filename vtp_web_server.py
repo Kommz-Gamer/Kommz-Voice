@@ -50,7 +50,7 @@ import tempfile
 import base64
 import json as pyjson
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import wraps
 
 from flask import (
@@ -89,6 +89,11 @@ VOICE_SECRET_SALT = os.environ.get("VOICE_SECRET_SALT", "").strip()
 DESKTOP_SECRET_SALT = os.environ.get("DESKTOP_SECRET_SALT", "VTP-2025-MAKE-AUTOMATION-X99").strip()
 PASSWORD_SALT = os.environ.get("PASSWORD_SALT", "").strip()
 ADMIN_SECRET = os.environ.get("ADMIN_SECRET", "").strip()
+
+# Trial config (free plan hard limits)
+TRIAL_WINDOW_HOURS = int(os.environ.get("TRIAL_WINDOW_HOURS", "24"))
+TRIAL_MAX_AUDIO_SECONDS = int(os.environ.get("TRIAL_MAX_AUDIO_SECONDS", "1800"))  # 30 min
+TRIAL_MAX_GENERATIONS = int(os.environ.get("TRIAL_MAX_GENERATIONS", "120"))
 
 
 def _jwt_payload(token: str) -> dict:
@@ -247,6 +252,80 @@ def generate_api_key() -> str:
     return f"KV-{uuid.uuid4().hex.upper()}"
 
 
+def _get_client_ip() -> str:
+    xff = request.headers.get("X-Forwarded-For", "").strip()
+    if xff:
+        return xff.split(",")[0].strip()
+    return (request.remote_addr or "0.0.0.0").strip()
+
+
+def _stable_hash(value: str) -> str:
+    seed = f"{ADMIN_SECRET}|{value or ''}"
+    return hashlib.sha256(seed.encode("utf-8")).hexdigest()
+
+
+def _estimate_audio_seconds(text: str, speed: float = 1.0) -> int:
+    # Heuristic: ~14 chars/sec at speed=1.0 (French conversational output)
+    safe_speed = max(0.5, min(2.0, float(speed or 1.0)))
+    cps = 14.0 * safe_speed
+    return max(1, int(round(len(text) / cps)))
+
+
+def _get_trial_status_for_user(user: dict) -> dict:
+    if not user:
+        return {"is_trial": False, "active": False}
+
+    key = (user.get("license_key") or "").strip().upper()
+    if not key.startswith("TRIAL-"):
+        return {"is_trial": False, "active": False}
+
+    created_raw = user.get("created_at")
+    try:
+        created_dt = datetime.fromisoformat(str(created_raw).replace("Z", "+00:00"))
+        if created_dt.tzinfo is not None:
+            created_dt = created_dt.replace(tzinfo=None)
+    except Exception:
+        created_dt = datetime.utcnow()
+
+    expires_at = created_dt + timedelta(hours=TRIAL_WINDOW_HOURS)
+    now = datetime.utcnow()
+    expired = now >= expires_at
+
+    used_seconds = 0
+    generations = 0
+    try:
+        logs = (
+            supabase.table("generation_logs")
+            .select("duration_ms,source")
+            .eq("user_id", user["id"])
+            .execute()
+        )
+        rows = logs.data or []
+        generations = len(rows)
+        used_ms = sum(int((r or {}).get("duration_ms") or 0) for r in rows)
+        used_seconds = int(used_ms / 1000)
+    except Exception:
+        pass
+
+    remaining_seconds = max(0, TRIAL_MAX_AUDIO_SECONDS - used_seconds)
+    remaining_generations = max(0, TRIAL_MAX_GENERATIONS - generations)
+    active = (not expired) and remaining_seconds > 0 and remaining_generations > 0
+
+    return {
+        "is_trial": True,
+        "active": active,
+        "expired": expired,
+        "window_hours": TRIAL_WINDOW_HOURS,
+        "max_audio_seconds": TRIAL_MAX_AUDIO_SECONDS,
+        "max_generations": TRIAL_MAX_GENERATIONS,
+        "used_seconds": used_seconds,
+        "used_generations": generations,
+        "remaining_seconds": remaining_seconds,
+        "remaining_generations": remaining_generations,
+        "expires_at": expires_at.isoformat() + "Z",
+    }
+
+
 # =============================================================================
 # VÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â°RIFICATION LICENCE VCV-
 # =============================================================================
@@ -351,9 +430,11 @@ def register():
     Elle est marquÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©e comme utilisÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©e en Supabase aprÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¨s succÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¨s.
     """
     data = request.get_json() or {}
-    email       = (data.get("email") or "").strip().lower()
-    password    = (data.get("password") or "").strip()
+    email = (data.get("email") or "").strip().lower()
+    password = (data.get("password") or "").strip()
     license_key = (data.get("license_key") or "").strip().upper()
+    trial_mode = str(data.get("trial_mode", "")).strip().lower() in {"1", "true", "yes", "on"}
+    trial_fingerprint_raw = (data.get("trial_fingerprint") or "").strip()
 
     # Validations basiques
     if not email or "@" not in email:
@@ -443,6 +524,117 @@ def register():
     })
 
 
+@app.route("/trial/register", methods=["POST"])
+def register_trial():
+    """Création d'un compte essai gratuit avec anti-abus."""
+    data = request.get_json() or {}
+    email = (data.get("email") or "").strip().lower()
+    password = (data.get("password") or "").strip()
+    trial_fingerprint_raw = (data.get("trial_fingerprint") or "").strip()
+
+    if not email or "@" not in email:
+        return jsonify({"success": False, "error": "Email invalide"}), 400
+    if len(password) < 8:
+        return jsonify({"success": False, "error": "Mot de passe trop court (8 caractères min)"}), 400
+
+    try:
+        existing = supabase.table("users").select("id").eq("email", email).execute()
+        if existing.data:
+            return jsonify({"success": False, "error": "Email déjà utilisé"}), 409
+    except Exception as e:
+        return jsonify({"success": False, "error": f"Erreur DB: {e}"}), 500
+
+    client_ip = _get_client_ip()
+    trial_fp_base = trial_fingerprint_raw or f"{request.user_agent.string}|{request.headers.get('Accept-Language', '')}"
+    fp_key = f"TRIAL-FP-{_stable_hash(f'fp:{trial_fp_base}')[:24]}"
+    ip_key = f"TRIAL-IP-{_stable_hash(f'ip:{client_ip}')[:24]}"
+
+    try:
+        by_email = (
+            supabase.table("license_keys")
+            .select("key_value")
+            .eq("product", "trial")
+            .eq("activated_by_email", email)
+            .limit(1)
+            .execute()
+        )
+        if by_email.data:
+            return jsonify({"success": False, "error": "Essai déjà utilisé sur cet email"}), 409
+    except Exception:
+        pass
+
+    for lock_key, reason in ((fp_key, "cet appareil"), (ip_key, "cette connexion")):
+        try:
+            lock_row = (
+                supabase.table("license_keys")
+                .select("key_value")
+                .eq("key_value", lock_key)
+                .eq("product", "trial")
+                .limit(1)
+                .execute()
+            )
+            if lock_row.data:
+                return jsonify({"success": False, "error": f"Essai déjà utilisé sur {reason}"}), 409
+        except Exception:
+            pass
+
+    trial_expiry_ts = int(time.time()) + (TRIAL_WINDOW_HOURS * 3600)
+    trial_rand = uuid.uuid4().hex[:4].upper()
+    trial_sig = hashlib.sha256(f"{trial_expiry_ts}{trial_rand}{VOICE_SECRET_SALT}".encode()).hexdigest()[:8].upper()
+    trial_license = f"TRIAL-{trial_expiry_ts}-{trial_rand}-{trial_sig}"
+
+    new_user = {
+        "id": str(uuid.uuid4()),
+        "email": email,
+        "password": hash_password(password),
+        "api_key": generate_api_key(),
+        "license_key": trial_license,
+        "created_at": datetime.utcnow().isoformat(),
+    }
+    try:
+        result = supabase.table("users").insert(new_user).execute()
+        created_user = result.data[0]
+    except Exception as e:
+        return jsonify({"success": False, "error": f"Erreur création compte: {e}"}), 500
+
+    expiration_date = (datetime.utcnow() + timedelta(hours=TRIAL_WINDOW_HOURS)).strftime("%d/%m/%Y")
+    try:
+        supabase.table("license_keys").upsert({
+            "key_value": trial_license,
+            "product": "trial",
+            "is_activated": True,
+            "activated_by_email": email,
+            "activated_by_user_id": created_user["id"],
+            "activated_at": datetime.utcnow().isoformat(),
+            "expiration": expiration_date,
+        }, on_conflict="key_value").execute()
+
+        for lk in (fp_key, ip_key):
+            supabase.table("license_keys").upsert({
+                "key_value": lk,
+                "product": "trial",
+                "is_activated": True,
+                "activated_by_email": email,
+                "activated_by_user_id": created_user["id"],
+                "activated_at": datetime.utcnow().isoformat(),
+                "expiration": expiration_date,
+            }, on_conflict="key_value").execute()
+    except Exception as e:
+        print(f"[WARN] Trial lock save failed: {e}")
+
+    session["user_id"] = created_user["id"]
+    session["email"] = created_user["email"]
+    trial_status = _get_trial_status_for_user(created_user)
+
+    return jsonify({
+        "success": True,
+        "user_id": created_user["id"],
+        "email": created_user["email"],
+        "api_key": created_user["api_key"],
+        "trial": trial_status,
+    })
+
+
 @app.route("/login", methods=["POST"])
 def login():
     """
@@ -514,6 +706,35 @@ def me():
         "id":      user["id"],
         "email":   user["email"],
         "api_key": user["api_key"],
+        "trial":   _get_trial_status_for_user(user),
+    })
+
+
+@app.route("/api/trial/status", methods=["GET"])
+@login_required
+def trial_status():
+    user = get_current_user()
+    if not user:
+        return jsonify({"success": False, "error": "Session invalide"}), 401
+
+    status = _get_trial_status_for_user(user)
+    if not status.get("is_trial"):
+        return jsonify({
+            "success": True,
+            "is_trial": False,
+            "active": False,
+        })
+
+    remaining_seconds = int(status.get("remaining_seconds", 0))
+    phrases = {
+        "courtes": max(0, remaining_seconds // 4),   # ~4 sec/phrase
+        "moyennes": max(0, remaining_seconds // 8),  # ~8 sec/phrase
+        "longues": max(0, remaining_seconds // 14),  # ~14 sec/phrase
+    }
+    return jsonify({
+        "success": True,
+        **status,
+        "remaining_phrases": phrases,
     })
 
 
@@ -956,16 +1177,40 @@ def generate_voice():
     if len(text) > 5000:
         return jsonify({"success": False, "error": "Texte trop long (max 5000 caractÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¨res)"}), 400
 
+    user = get_current_user()
+    if not user:
+        return jsonify({"success": False, "error": "Session invalide"}), 401
+
+    est_seconds = _estimate_audio_seconds(text, speed)
+    trial = _get_trial_status_for_user(user)
+    if trial.get("is_trial"):
+        if not trial.get("active"):
+            return jsonify({
+                "success": False,
+                "error": "Essai expiré ou quota atteint",
+                "trial": trial,
+            }), 403
+        if trial.get("remaining_seconds", 0) < est_seconds:
+            return jsonify({
+                "success": False,
+                "error": "Quota essai insuffisant pour ce texte",
+                "trial": trial,
+                "required_seconds": est_seconds,
+            }), 403
+
     # RÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©cupÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©ration du profil vocal
     if not profile_id:
         return jsonify({"success": False, "error": "profile_id requis"}), 400
 
     try:
-        profile_result = supabase.table("voice_profiles")\
-            .select("*")\
-            .eq("id", profile_id)\
-            .single()\
+        profile_result = (
+            supabase.table("voice_profiles")
+            .select("*")
+            .eq("id", profile_id)
+            .eq("user_id", user_id)
+            .single()
             .execute()
+        )
         profile = profile_result.data
     except Exception:
         return jsonify({"success": False, "error": "Profil vocal introuvable"}), 404
@@ -1020,11 +1265,24 @@ def generate_voice():
         except Exception:
             audio_url = ""  # Non bloquant
 
+        source = "trial:web" if trial.get("is_trial") else "web"
+        try:
+            supabase.table("generation_logs").insert({
+                "user_id": user_id,
+                "profile_id": profile_id,
+                "text_length": len(text),
+                "duration_ms": int(est_seconds * 1000),
+                "source": source,
+            }).execute()
+        except Exception as log_err:
+            print(f"[WARN] generation_logs insert failed: {log_err}")
+
         # Retourne le fichier directement en streaming si possible
         return jsonify({
             "success":   True,
             "audio_url": audio_url,
             "profile":   profile.get("name", ""),
+            "estimated_seconds": est_seconds,
         })
 
     except requests.Timeout:
@@ -1081,6 +1339,18 @@ def api_synthesis():
     if not text or not profile_id:
         return jsonify({"error": "text et voice_id requis"}), 400
 
+    est_seconds = _estimate_audio_seconds(text, speed)
+    trial = _get_trial_status_for_user(api_user)
+    if trial.get("is_trial"):
+        if not trial.get("active"):
+            return jsonify({"error": "Essai expiré ou quota atteint", "trial": trial}), 403
+        if trial.get("remaining_seconds", 0) < est_seconds:
+            return jsonify({
+                "error": "Quota essai insuffisant pour ce texte",
+                "trial": trial,
+                "required_seconds": est_seconds,
+            }), 403
+
     # Logique identique ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  /api/generate (extrait pour ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©viter la dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©pendance session)
     try:
         profile_result = supabase.table("voice_profiles")\
@@ -1126,8 +1396,19 @@ def api_synthesis():
             file_options={"content-type": "audio/wav"}
         )
         audio_url = supabase.storage.from_(STORAGE_BUCKET).get_public_url(result_path)
+        source = "trial:api" if trial.get("is_trial") else "api"
+        try:
+            supabase.table("generation_logs").insert({
+                "user_id": api_user["id"],
+                "profile_id": profile_id,
+                "text_length": len(text),
+                "duration_ms": int(est_seconds * 1000),
+                "source": source,
+            }).execute()
+        except Exception as log_err:
+            print(f"[WARN] generation_logs insert failed (api): {log_err}")
 
-        return jsonify({"success": True, "audio_url": audio_url})
+        return jsonify({"success": True, "audio_url": audio_url, "estimated_seconds": est_seconds})
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
