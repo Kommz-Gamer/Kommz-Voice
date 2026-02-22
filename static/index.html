@@ -989,34 +989,48 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
                     "Je garde un ton clair et rapide, sans crier, pour que les appels d'équipe restent précis pendant les combats.",
                     "Contact à gauche, je couvre l'entrée, on push à trois dans cinq secondes, puis on rotate sur l'objectif central.",
                     "Si vous m'entendez correctement, cela valide mon setup audio pour le jeu compétitif et le stream.",
-                    "Ce test inclut des mots courts, des nombres et des accents pour améliorer la fidélité du clone vocal."
+                    "Ce test inclut des mots courts, des nombres et des accents pour améliorer la fidélité du clone vocal.",
+                    "Top départ dans dix secondes, on sécurise la zone puis on enchaîne immédiatement sur le point suivant.",
+                    "Je donne des informations brèves et nettes pour maintenir une communication utile en pleine action.",
+                    "On garde le focus, on synchronise les déplacements et on annonce chaque contact sans panique."
                 ],
                 narration:[
                     "Dans la lumière du matin, la ville s'éveille lentement, et chaque rue raconte une histoire différente.",
                     "Je pose la voix, j'articule chaque mot, et je laisse respirer les silences pour un rendu plus naturel.",
                     "Le narrateur avance avec calme, décrit les détails, puis accentue l'émotion au moment clé du récit.",
                     "Cette prise sert à capturer un timbre stable, une diction propre et une intonation nuancée.",
-                    "Je conclus ce passage avec une cadence douce, régulière et expressive."
+                    "Je conclus ce passage avec une cadence douce, régulière et expressive.",
+                    "Au loin, un vent léger traverse les arbres et transforme le silence en promesse d'aventure.",
+                    "Chaque phrase s'installe avec précision pour construire une ambiance claire et immersive.",
+                    "La narration progresse en douceur, entre observation attentive et émotion contenue."
                 ],
                 podcast:[
                     "Bienvenue dans cet épisode, aujourd'hui on parle d'audio, de création de contenu et de workflow efficace.",
                     "Je vais structurer les idées en trois points simples: préparation, enregistrement et postproduction.",
                     "L'objectif est d'obtenir une voix crédible, chaleureuse et constante du début à la fin.",
                     "On garde un débit naturel, on évite les tics de langage, et on articule clairement les mots techniques.",
-                    "Merci d'avoir écouté ce test, on se retrouve très vite pour la suite."
+                    "Merci d'avoir écouté ce test, on se retrouve très vite pour la suite.",
+                    "Dans cette partie, je partage des méthodes concrètes pour améliorer la clarté et le rythme à l'antenne.",
+                    "Un bon épisode repose sur une voix stable, une structure claire et des transitions fluides.",
+                    "On termine avec un résumé rapide des points clés pour ancrer les informations essentielles."
                 ],
                 pro:[
                     "Bonjour, je vous présente un court point d'avancement sur le projet et les prochaines étapes opérationnelles.",
                     "Nous validons aujourd'hui les livrables prioritaires, le calendrier, et les risques à surveiller.",
                     "Je maintiens un ton professionnel, clair et posé, afin de garantir une compréhension immédiate.",
                     "Ce test vocal couvre les termes métiers, les chiffres, et la précision de la prononciation.",
-                    "Merci pour votre attention, je reste disponible pour toute question complémentaire."
+                    "Merci pour votre attention, je reste disponible pour toute question complémentaire.",
+                    "Le planning de déploiement reste inchangé, avec un contrôle qualité renforcé sur les points critiques.",
+                    "Nous consolidons les indicateurs de performance afin de fiabiliser les décisions de pilotage.",
+                    "Cette synthèse vise une communication concise, structurée et directement exploitable."
                 ]
             };
             const pool=pools[theme]||pools.gaming;
-            const out=[];let words=0;let i=0;
+            const out=[];let words=0;
+            const startIndex=Math.floor(Math.random()*pool.length);
+            let i=0;
             while(words<targetWords){
-                const s=pool[i%pool.length];
+                const s=pool[(startIndex+i)%pool.length];
                 out.push(s);
                 words += s.trim().split(/\s+/).length;
                 i++;
