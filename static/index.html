@@ -158,6 +158,19 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
 .dur-mark-label{position:absolute;top:-18px;font-family:var(--mono);font-size:.55rem;color:var(--muted);transform:translateX(-50%);font-weight:700;white-space:nowrap;}
 .dur-mark.reached .dur-mark-label{color:#fff;}
 
+/* SCRIPT GENERATOR */
+.script-gen{margin-top:12px;padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--bg-input);}
+.script-gen-top{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;}
+.script-gen-title{font-family:var(--mono);font-size:.62rem;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;font-weight:700;}
+.script-gen-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.script-duration{background:var(--bg-void);border:1px solid var(--border);color:var(--muted-light);padding:7px 9px;border-radius:9px;font-size:.72rem;outline:none;min-width:130px;}
+.script-btn{padding:8px 12px;background:rgba(124,58,237,.14);border:1px solid rgba(124,58,237,.32);border-radius:9px;color:var(--violet-light);font-size:.7rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;}
+.script-btn:hover{background:rgba(124,58,237,.24);border-color:var(--violet);}
+.script-copy{background:rgba(34,211,238,.08);border-color:rgba(34,211,238,.28);color:var(--cyan);}
+.script-copy:hover{background:rgba(34,211,238,.16);border-color:var(--cyan);}
+.script-text{width:100%;min-height:112px;resize:vertical;background:var(--bg-void);border:1px solid var(--border);color:#e5e7eb;border-radius:10px;padding:10px 12px;font-size:.78rem;line-height:1.45;outline:none;}
+.script-meta{margin-top:6px;font-size:.68rem;color:var(--muted);display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;}
+
 /* WHISPER */
 .whisper-row{display:none;align-items:center;gap:8px;margin-top:10px;}
 .whisper-row.visible{display:flex;}
@@ -483,6 +496,30 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
                             </div>
                         </div>
 
+                        <div class="script-gen">
+                            <div class="script-gen-top">
+                                <div class="script-gen-title">Générateur de texte à dire (audio & micro)</div>
+                                <div class="script-gen-controls">
+                                    <select id="scriptDuration" class="script-duration">
+                                        <option value="auto">Durée auto (détectée/live)</option>
+                                        <option value="10">10s (mini)</option>
+                                        <option value="20">20s</option>
+                                        <option value="30" selected>30s (idéal)</option>
+                                        <option value="45">45s</option>
+                                        <option value="60">60s</option>
+                                        <option value="90">90s (max)</option>
+                                    </select>
+                                    <button class="script-btn" type="button" onclick="app.generateScript()"><i class="bi bi-stars"></i> Générer</button>
+                                    <button class="script-btn script-copy" type="button" onclick="app.copyGeneratedScript()"><i class="bi bi-clipboard"></i> Copier</button>
+                                </div>
+                            </div>
+                            <textarea id="generatedScript" class="script-text" placeholder="Cliquez sur Générer pour obtenir un texte calibré selon la durée choisie..."></textarea>
+                            <div class="script-meta">
+                                <span id="scriptMeta">Durée cible: 30s · ~70 mots</span>
+                                <span>Astuce: lisez naturellement, sans accélérer.</span>
+                            </div>
+                        </div>
+
                         <!-- WHISPER : analyse texte de référence -->
                         <div class="whisper-row" id="whisperRow">
                             <select id="whisperModel" class="whisper-model">
@@ -778,14 +815,18 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
             this.currentPreviewId=null;this.ctxId=null;
             this.mediaRecorder=null;this.micChunks=[];
             this.isMicRec=false;this.micSec=0;this.micInterval=null;
+            this.detectedDurationSec=0;
             const audioInput=document.getElementById('audioFile');
             if(audioInput){audioInput.addEventListener('change',e=>{const f=e.target.files[0];if(f)this.uploadFile(f);});}
+            const scriptDur=document.getElementById('scriptDuration');
+            if(scriptDur){scriptDur.addEventListener('change',()=>this.updateScriptMeta());}
             document.addEventListener('click',()=>this.hideCtx());
             if(document.getElementById('voiceGrid')) this.loadProfiles();
             if(document.getElementById('trialStatusCard')){
                 this.loadTrialStatus();
                 this._trialInterval = setInterval(()=>this.loadTrialStatus(), 30000);
             }
+            this.updateScriptMeta();
         }
 
         async loadTrialStatus(){
@@ -841,7 +882,7 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
         }
 
         /* UPLOAD */
-        async uploadFile(file){
+        async uploadFile(file,opts={}){
             this.fileId=null;
             showToast('Upload','Transfert en cours...','info');
             const fd=new FormData();fd.append('file',file);
@@ -850,25 +891,112 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
                 const d=await r.json();
                 if(!r.ok)throw new Error(d.error||'Upload échoué');
                 this.fileId=d.file_id;
-                this.showFileLoaded(file.name);
+                let durationSec=Number(opts.durationSec||0);
+                if(!durationSec){
+                    durationSec=await this.detectAudioDuration(file);
+                }
+                this.showFileLoaded(file.name,durationSec,opts.source||'file');
                 showToast('Upload','Fichier prêt pour le clonage.','success');
             }catch(e){showToast('Erreur',e.message,'error');}
         }
-        showFileLoaded(name){
-            document.getElementById('fileName').textContent=name;
-            document.getElementById('fileLoaded').classList.add('visible');
-            const dur=Math.floor(Math.random()*55)+10;
+        async detectAudioDuration(file){
+            try{
+                const objectUrl=URL.createObjectURL(file);
+                const audio=new Audio();
+                const duration=await new Promise(resolve=>{
+                    const cleanup=(val)=>{try{URL.revokeObjectURL(objectUrl);}catch(_e){} resolve(val);};
+                    audio.preload='metadata';
+                    audio.onloadedmetadata=()=>cleanup(Number(audio.duration||0));
+                    audio.onerror=()=>cleanup(0);
+                    audio.src=objectUrl;
+                });
+                if(!Number.isFinite(duration)) return 0;
+                return Math.max(0,Math.round(duration));
+            }catch(_e){return 0;}
+        }
+        updateDurationUi(durationSec){
+            const dur=Math.max(0,Math.round(Number(durationSec||0)));
+            this.detectedDurationSec=dur;
             document.getElementById('durVal').textContent=dur+'s';
             document.getElementById('durFill').style.width=Math.min((dur/90)*100,100)+'%';
             document.getElementById('durSection').classList.add('visible');
             document.getElementById('mark10').classList.toggle('reached',dur>=10);
             document.getElementById('mark30').classList.toggle('reached',dur>=30);
             document.getElementById('mark90').classList.toggle('reached',dur>=90);
+        }
+        showFileLoaded(name,durationSec=0,source='file'){
+            document.getElementById('fileName').textContent=name;
+            document.getElementById('fileLoaded').classList.add('visible');
+            this.updateDurationUi(durationSec);
             const wRow=document.getElementById('whisperRow');wRow.classList.add('visible');
             const btn=document.getElementById('whisperBtn');
             btn.classList.remove('done');btn.disabled=false;
             document.getElementById('whisperLabel').textContent='Analyser & Transcrire';
             document.getElementById('whisperIcon').className='bi bi-magic';
+            this.updateScriptMeta();
+        }
+        getTargetDurationSec(){
+            const el=document.getElementById('scriptDuration');
+            const val=(el?.value||'30').trim();
+            if(val!=='auto'){
+                const n=parseInt(val,10);
+                return Number.isFinite(n)?Math.max(10,Math.min(90,n)):30;
+            }
+            const liveMic = this.isMicRec ? this.micSec : 0;
+            const auto = liveMic || this.detectedDurationSec || 30;
+            return Math.max(10,Math.min(90,Math.round(auto)));
+        }
+        estimateWordTarget(sec){
+            // 2.2 mots/s ≈ débit naturel en lecture.
+            return Math.max(25,Math.min(420,Math.round(sec*2.2)));
+        }
+        buildScriptByDuration(sec){
+            const targetWords=this.estimateWordTarget(sec);
+            const pool=[
+                "Bonjour, je m'appelle Alex et je teste la qualité de ma voix pour créer un clone vocal naturel et stable.",
+                "Je lis ce texte avec un rythme régulier pour conserver une diction claire, une bonne articulation et une intonation fluide.",
+                "Le but est d'obtenir un rendu propre, sans bruit de fond, sans saturation, et avec un volume constant du début à la fin.",
+                "Si vous m'entendez correctement, cela signifie que le micro est bien configuré et que l'acquisition audio fonctionne normalement.",
+                "Je vais varier légèrement le ton, accélérer puis ralentir, afin de fournir un échantillon vocal plus riche pour l'entraînement.",
+                "Cette phrase contient des nombres comme vingt, trente et quatre-vingt-dix, ainsi que quelques noms propres et des mots techniques.",
+                "Aujourd'hui je prépare un profil vocal pour le gaming, la narration et la communication en équipe multilingue.",
+                "Merci d'écouter cette démonstration, je termine cette prise avec une voix posée et une prononciation nette."
+            ];
+            const out=[];let words=0;let i=0;
+            while(words<targetWords){
+                const s=pool[i%pool.length];
+                out.push(s);
+                words += s.trim().split(/\s+/).length;
+                i++;
+            }
+            const raw=out.join(' ');
+            const arr=raw.split(/\s+/);
+            const trimTarget=Math.max(20,targetWords);
+            return arr.slice(0,trimTarget).join(' ') + '.';
+        }
+        updateScriptMeta(){
+            const sec=this.getTargetDurationSec();
+            const words=this.estimateWordTarget(sec);
+            const mode=((document.getElementById('scriptDuration')?.value||'30')==='auto')?'auto':'fixe';
+            const meta=document.getElementById('scriptMeta');
+            if(meta) meta.textContent=`Durée cible: ${sec}s (${mode}) · ~${words} mots`;
+        }
+        generateScript(){
+            const sec=this.getTargetDurationSec();
+            const text=this.buildScriptByDuration(sec);
+            const ta=document.getElementById('generatedScript');
+            if(ta) ta.value=text;
+            this.updateScriptMeta();
+            showToast('Script',`Texte généré pour ~${sec}s.`,'success');
+        }
+        copyGeneratedScript(){
+            const ta=document.getElementById('generatedScript');
+            const value=(ta?.value||'').trim();
+            if(!value){showToast('Script','Générez un texte avant de copier.','warning');return;}
+            navigator.clipboard.writeText(value).then(
+                ()=>showToast('Script','Texte copié dans le presse-papier.','success'),
+                ()=>showToast('Script','Copie impossible.','error')
+            );
         }
 
         /* WHISPER — BUG FIX */
@@ -907,7 +1035,7 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
                 this.mediaRecorder.ondataavailable=e=>{if(e.data.size>0)this.micChunks.push(e.data);};
                 this.mediaRecorder.onstop=()=>{
                     const blob=new Blob(this.micChunks,{type:'audio/wav'});
-                    this.uploadFile(new File([blob],'mic_capture.wav',{type:'audio/wav'}));
+                    this.uploadFile(new File([blob],'mic_capture.wav',{type:'audio/wav'}),{durationSec:this.micSec,source:'mic'});
                     document.getElementById('micTimer').classList.remove('active');clearInterval(this.micInterval);
                 };
                 this.mediaRecorder.start();this.isMicRec=true;
@@ -920,6 +1048,7 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
                     this.micSec++;
                     const m=String(Math.floor(this.micSec/60)).padStart(2,'0'),s=String(this.micSec%60).padStart(2,'0');
                     document.getElementById('micTimer').textContent=`⏺ ${m}:${s} — Capture en cours`;
+                    if((document.getElementById('scriptDuration')?.value||'')==='auto'){this.updateScriptMeta();}
                 },1000);
             }catch(e){showToast('Micro','Accès refusé.','error');}
         }
@@ -995,6 +1124,12 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
             document.getElementById('whisperLabel').textContent='Analyser & Transcrire';
             document.getElementById('whisperIcon').className='bi bi-magic';
             document.getElementById('audioFile').value='';
+            this.detectedDurationSec=0;
+            const scriptTa=document.getElementById('generatedScript');
+            if(scriptTa) scriptTa.value='';
+            const scriptDur=document.getElementById('scriptDuration');
+            if(scriptDur) scriptDur.value='30';
+            this.updateScriptMeta();
         }
     }
 
