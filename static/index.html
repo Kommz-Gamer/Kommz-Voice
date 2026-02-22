@@ -164,6 +164,7 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
 .script-gen-title{font-family:var(--mono);font-size:.62rem;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;font-weight:700;}
 .script-gen-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
 .script-duration{background:var(--bg-void);border:1px solid var(--border);color:var(--muted-light);padding:7px 9px;border-radius:9px;font-size:.72rem;outline:none;min-width:130px;}
+.script-theme{background:var(--bg-void);border:1px solid var(--border);color:var(--muted-light);padding:7px 9px;border-radius:9px;font-size:.72rem;outline:none;min-width:130px;}
 .script-btn{padding:8px 12px;background:rgba(124,58,237,.14);border:1px solid rgba(124,58,237,.32);border-radius:9px;color:var(--violet-light);font-size:.7rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;}
 .script-btn:hover{background:rgba(124,58,237,.24);border-color:var(--violet);}
 .script-copy{background:rgba(34,211,238,.08);border-color:rgba(34,211,238,.28);color:var(--cyan);}
@@ -500,6 +501,12 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
                             <div class="script-gen-top">
                                 <div class="script-gen-title">Générateur de texte à dire (audio & micro)</div>
                                 <div class="script-gen-controls">
+                                    <select id="scriptTheme" class="script-theme">
+                                        <option value="gaming" selected>Thème: Gaming</option>
+                                        <option value="narration">Thème: Narration</option>
+                                        <option value="podcast">Thème: Podcast</option>
+                                        <option value="pro">Thème: Professionnel</option>
+                                    </select>
                                     <select id="scriptDuration" class="script-duration">
                                         <option value="auto">Durée auto (détectée/live)</option>
                                         <option value="10">10s (mini)</option>
@@ -820,6 +827,8 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
             if(audioInput){audioInput.addEventListener('change',e=>{const f=e.target.files[0];if(f)this.uploadFile(f);});}
             const scriptDur=document.getElementById('scriptDuration');
             if(scriptDur){scriptDur.addEventListener('change',()=>this.updateScriptMeta());}
+            const scriptTheme=document.getElementById('scriptTheme');
+            if(scriptTheme){scriptTheme.addEventListener('change',()=>this.updateScriptMeta());}
             document.addEventListener('click',()=>this.hideCtx());
             if(document.getElementById('voiceGrid')) this.loadProfiles();
             if(document.getElementById('trialStatusCard')){
@@ -950,18 +959,43 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
             // 2.2 mots/s ≈ débit naturel en lecture.
             return Math.max(25,Math.min(420,Math.round(sec*2.2)));
         }
-        buildScriptByDuration(sec){
+        getScriptTheme(){
+            const el=document.getElementById('scriptTheme');
+            return (el?.value||'gaming').trim();
+        }
+        buildScriptByDuration(sec,theme='gaming'){
             const targetWords=this.estimateWordTarget(sec);
-            const pool=[
-                "Bonjour, je m'appelle Alex et je teste la qualité de ma voix pour créer un clone vocal naturel et stable.",
-                "Je lis ce texte avec un rythme régulier pour conserver une diction claire, une bonne articulation et une intonation fluide.",
-                "Le but est d'obtenir un rendu propre, sans bruit de fond, sans saturation, et avec un volume constant du début à la fin.",
-                "Si vous m'entendez correctement, cela signifie que le micro est bien configuré et que l'acquisition audio fonctionne normalement.",
-                "Je vais varier légèrement le ton, accélérer puis ralentir, afin de fournir un échantillon vocal plus riche pour l'entraînement.",
-                "Cette phrase contient des nombres comme vingt, trente et quatre-vingt-dix, ainsi que quelques noms propres et des mots techniques.",
-                "Aujourd'hui je prépare un profil vocal pour le gaming, la narration et la communication en équipe multilingue.",
-                "Merci d'écouter cette démonstration, je termine cette prise avec une voix posée et une prononciation nette."
-            ];
+            const pools={
+                gaming:[
+                    "Squad, check micro, je suis prêt pour la partie classée et je communique position, timing et ressources en temps réel.",
+                    "Je garde un ton clair et rapide, sans crier, pour que les appels d'équipe restent précis pendant les combats.",
+                    "Contact à gauche, je couvre l'entrée, on push à trois dans cinq secondes, puis on rotate sur l'objectif central.",
+                    "Si vous m'entendez correctement, cela valide mon setup audio pour le jeu compétitif et le stream.",
+                    "Ce test inclut des mots courts, des nombres et des accents pour améliorer la fidélité du clone vocal."
+                ],
+                narration:[
+                    "Dans la lumière du matin, la ville s'éveille lentement, et chaque rue raconte une histoire différente.",
+                    "Je pose la voix, j'articule chaque mot, et je laisse respirer les silences pour un rendu plus naturel.",
+                    "Le narrateur avance avec calme, décrit les détails, puis accentue l'émotion au moment clé du récit.",
+                    "Cette prise sert à capturer un timbre stable, une diction propre et une intonation nuancée.",
+                    "Je conclus ce passage avec une cadence douce, régulière et expressive."
+                ],
+                podcast:[
+                    "Bienvenue dans cet épisode, aujourd'hui on parle d'audio, de création de contenu et de workflow efficace.",
+                    "Je vais structurer les idées en trois points simples: préparation, enregistrement et postproduction.",
+                    "L'objectif est d'obtenir une voix crédible, chaleureuse et constante du début à la fin.",
+                    "On garde un débit naturel, on évite les tics de langage, et on articule clairement les mots techniques.",
+                    "Merci d'avoir écouté ce test, on se retrouve très vite pour la suite."
+                ],
+                pro:[
+                    "Bonjour, je vous présente un court point d'avancement sur le projet et les prochaines étapes opérationnelles.",
+                    "Nous validons aujourd'hui les livrables prioritaires, le calendrier, et les risques à surveiller.",
+                    "Je maintiens un ton professionnel, clair et posé, afin de garantir une compréhension immédiate.",
+                    "Ce test vocal couvre les termes métiers, les chiffres, et la précision de la prononciation.",
+                    "Merci pour votre attention, je reste disponible pour toute question complémentaire."
+                ]
+            };
+            const pool=pools[theme]||pools.gaming;
             const out=[];let words=0;let i=0;
             while(words<targetWords){
                 const s=pool[i%pool.length];
@@ -978,12 +1012,14 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
             const sec=this.getTargetDurationSec();
             const words=this.estimateWordTarget(sec);
             const mode=((document.getElementById('scriptDuration')?.value||'30')==='auto')?'auto':'fixe';
+            const theme=this.getScriptTheme();
+            const themeLabel={gaming:'Gaming',narration:'Narration',podcast:'Podcast',pro:'Pro'}[theme]||'Gaming';
             const meta=document.getElementById('scriptMeta');
-            if(meta) meta.textContent=`Durée cible: ${sec}s (${mode}) · ~${words} mots`;
+            if(meta) meta.textContent=`Durée cible: ${sec}s (${mode}) · ~${words} mots · Thème: ${themeLabel}`;
         }
         generateScript(){
             const sec=this.getTargetDurationSec();
-            const text=this.buildScriptByDuration(sec);
+            const text=this.buildScriptByDuration(sec,this.getScriptTheme());
             const ta=document.getElementById('generatedScript');
             if(ta) ta.value=text;
             this.updateScriptMeta();
@@ -1129,6 +1165,8 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
             if(scriptTa) scriptTa.value='';
             const scriptDur=document.getElementById('scriptDuration');
             if(scriptDur) scriptDur.value='30';
+            const scriptTheme=document.getElementById('scriptTheme');
+            if(scriptTheme) scriptTheme.value='gaming';
             this.updateScriptMeta();
         }
     }
