@@ -51,6 +51,7 @@ import base64
 import json as pyjson
 import requests
 import threading
+from urllib.parse import urlsplit, urlunsplit
 from datetime import datetime, timedelta
 from functools import wraps
 
@@ -84,6 +85,42 @@ MODAL_XTTS_URL = os.environ.get(
     "https://your-app--kommz-voice-xtts.modal.run",
 ).strip().rstrip("/")
 MODAL_XTTS_WARMUP_URL = os.environ.get("MODAL_XTTS_WARMUP_URL", "").strip().rstrip("/")
+
+
+def _derive_modal_endpoint(base_url: str, target: str) -> str:
+    """Supporte URL Modal de type function (-clone.modal.run) et path (/clone)."""
+    target = (target or "").strip().lower()
+    base_url = (base_url or "").strip().rstrip("/")
+    if not base_url:
+        return ""
+    try:
+        sp = urlsplit(base_url)
+        host = (sp.netloc or "").strip()
+        path = (sp.path or "").rstrip("/")
+        if host.endswith(".modal.run"):
+            for suffix in ("-clone.modal.run", "-warmup.modal.run", "-health.modal.run", "-generate.modal.run"):
+                if host.endswith(suffix):
+                    host = host[: -len(suffix)] + f"-{target}.modal.run"
+                    return urlunsplit((sp.scheme or "https", host, "", "", ""))
+        if path.endswith("/clone"):
+            path = path[:-6] + f"/{target}"
+        elif path.endswith("/generate"):
+            path = path[:-9] + f"/{target}"
+        elif path.endswith("/warmup") or path.endswith("/health"):
+            path = path.rsplit("/", 1)[0] + f"/{target}"
+        else:
+            path = f"{path}/{target}" if path else f"/{target}"
+        return urlunsplit((sp.scheme or "https", sp.netloc, path, "", ""))
+    except Exception:
+        return f"{base_url}/{target}"
+
+
+def _get_xtts_clone_url() -> str:
+    return _derive_modal_endpoint(MODAL_XTTS_URL, "clone")
+
+
+def _get_xtts_health_url() -> str:
+    return _derive_modal_endpoint(MODAL_XTTS_URL, "health")
 
 # Secrets
 SECRET_KEY = os.environ.get("SECRET_KEY", "").strip()
@@ -287,7 +324,7 @@ def _estimate_audio_seconds(text: str, speed: float = 1.0) -> int:
 def _get_xtts_warmup_url() -> str:
     if MODAL_XTTS_WARMUP_URL:
         return MODAL_XTTS_WARMUP_URL
-    return f"{MODAL_XTTS_URL}/warmup"
+    return _derive_modal_endpoint(MODAL_XTTS_URL, "warmup")
 
 
 def prewarm_xtts_async(force: bool = False, cooldown_seconds: int = 90) -> None:
@@ -313,7 +350,7 @@ def prewarm_xtts_async(force: bool = False, cooldown_seconds: int = 90) -> None:
                     pass
                 if not ok:
                     try:
-                        requests.get(f"{MODAL_XTTS_URL}/health", timeout=(4, 10))
+                        requests.get(_get_xtts_health_url(), timeout=(4, 10))
                     except Exception:
                         pass
                 _last_xtts_warmup_ts = time.time()
@@ -341,7 +378,7 @@ def _get_xtts_runtime_status(force: bool = False) -> dict:
     status_code = 0
     err = ""
     try:
-        r = requests.get(f"{MODAL_XTTS_URL}/health", timeout=(2, 5))
+        r = requests.get(_get_xtts_health_url(), timeout=(2, 5))
         status_code = int(r.status_code)
         online = bool(r.ok)
     except Exception as e:
@@ -1495,7 +1532,7 @@ def generate_voice():
     try:
         prewarm_xtts_async(force=False, cooldown_seconds=45)
         xtts_response = requests.post(
-            f"{MODAL_XTTS_URL}/clone",
+            _get_xtts_clone_url(),
             files={"speaker_wav": (file_id, reference_audio, "audio/wav")},
             data={
                 "text":            text,
@@ -1643,7 +1680,7 @@ def api_synthesis():
     try:
         prewarm_xtts_async(force=False, cooldown_seconds=45)
         xtts_response = requests.post(
-            f"{MODAL_XTTS_URL}/clone",
+            _get_xtts_clone_url(),
             files={"speaker_wav": (profile.get("file_id", "ref.wav"), reference_audio, "audio/wav")},
             data={
                 "text":           text,
