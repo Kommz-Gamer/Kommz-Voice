@@ -71,6 +71,12 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
 ============================== */
 .lab-view{height:100%;display:flex;flex-direction:column;overflow:hidden;}
 .lab-header{padding:28px 36px 24px;border-bottom:1px solid var(--border);display:flex;align-items:flex-end;justify-content:space-between;flex-shrink:0;}
+.lab-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end;}
+.xtts-status{display:inline-flex;align-items:center;gap:7px;padding:8px 11px;border-radius:11px;border:1px solid var(--border);background:var(--bg-input);font-size:.68rem;font-weight:700;color:var(--muted-light);}
+.xtts-dot{width:8px;height:8px;border-radius:50%;background:var(--muted);}
+.xtts-status.ready .xtts-dot{background:var(--green);box-shadow:0 0 8px rgba(16,185,129,.6);}
+.xtts-status.cold .xtts-dot{background:var(--yellow);box-shadow:0 0 8px rgba(245,158,11,.6);}
+.xtts-status.offline .xtts-dot{background:var(--red);box-shadow:0 0 8px rgba(239,68,68,.6);}
 .lab-eyebrow{font-family:var(--font);font-size:.6rem;color:var(--cyan);letter-spacing:.18em;text-transform:uppercase;margin-bottom:6px;}
 .lab-title{font-size:1.9rem;font-weight:800;letter-spacing:-.04em;line-height:1;}
 .lab-title span{background:linear-gradient(135deg,var(--violet-light),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
@@ -372,7 +378,7 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
                 <div class="user-chip">
                     <div class="user-avatar">{{ user.email[0]|upper }}</div>
                     <div style="flex:1;min-width:0;"><div class="user-email">{{ user.email }}</div><div class="user-status">Authentified ✓</div></div>
-                    <a href="/logout" class="logout-btn"><i class="bi bi-power"></i></a>
+                    <a href="#" class="logout-btn" onclick="doLogout(event)"><i class="bi bi-power"></i></a>
                 </div>
                 <div id="trialStatusCard" class="trial-card dn">
                     <div class="trial-title">Plan Essai</div>
@@ -391,7 +397,13 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
                         <div class="lab-title">Voice <span>Lab</span></div>
                         <div class="lab-sub">Banque d'empreintes vocales · Clonage vocal IA via Modal A10G</div>
                     </div>
-                    <button class="btn-new" onclick="openWizard()"><i class="bi bi-plus-lg"></i> Nouveau Clone</button>
+                    <div class="lab-actions">
+                        <div class="xtts-status" id="xttsStatusBadge" title="Vérification serveur de clonage...">
+                            <span class="xtts-dot"></span>
+                            <span id="xttsStatusText">Serveur clonage: vérification...</span>
+                        </div>
+                        <button class="btn-new" onclick="openWizard()"><i class="bi bi-plus-lg"></i> Nouveau Clone</button>
+                    </div>
                 </div>
                 <div class="voice-grid" id="voiceGrid"></div>
             </div>
@@ -822,6 +834,11 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
 
     /* === API === */
     function copyApiKey(){const v=document.getElementById('userApiKey')?.value;if(v){navigator.clipboard.writeText(v);showToast('Système','Clé API copiée.','success');}}
+    async function doLogout(e){
+        if(e)e.preventDefault();
+        try{await fetch('/logout',{method:'POST',credentials:'same-origin'});}catch(_e){}
+        window.location.href='/';
+    }
 
     /* === TOAST === */
     function showToast(title,msg,type='info'){
@@ -841,6 +858,7 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
             this.mediaRecorder=null;this.micChunks=[];
             this.isMicRec=false;this.micSec=0;this.micInterval=null;
             this.detectedDurationSec=0;
+            this.xttsStatusNotifiedState = "";
             const audioInput=document.getElementById('audioFile');
             if(audioInput){audioInput.addEventListener('change',e=>{const f=e.target.files[0];if(f)this.uploadFile(f);});}
             const scriptDur=document.getElementById('scriptDuration');
@@ -849,11 +867,50 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
             if(scriptTheme){scriptTheme.addEventListener('change',()=>this.updateScriptMeta());}
             document.addEventListener('click',()=>this.hideCtx());
             if(document.getElementById('voiceGrid')) this.loadProfiles();
+            this.loadXttsStatus();
+            this._xttsStatusInterval = setInterval(()=>this.loadXttsStatus(), 25000);
             if(document.getElementById('trialStatusCard')){
                 this.loadTrialStatus();
                 this._trialInterval = setInterval(()=>this.loadTrialStatus(), 30000);
             }
             this.updateScriptMeta();
+        }
+
+        async loadXttsStatus(){
+            const badge=document.getElementById('xttsStatusBadge');
+            const txt=document.getElementById('xttsStatusText');
+            if(!badge || !txt) return;
+            try{
+                const r=await fetch('/api/xtts/status', {cache:'no-store'});
+                const d=await r.json();
+                const state=(d?.state||'offline').toLowerCase();
+                badge.classList.remove('ready','cold','offline');
+                badge.classList.add(state==='ready'?'ready':(state==='cold'?'cold':'offline'));
+                if(state==='ready'){
+                    txt.textContent='Serveur clonage: en ligne';
+                    badge.title='Serveur prêt.';
+                }else if(state==='cold'){
+                    txt.textContent='Serveur clonage: en veille';
+                    badge.title='Première génération potentiellement plus lente.';
+                    if(this.xttsStatusNotifiedState!=='cold'){
+                        showToast('Clonage','Serveur en veille: la première génération peut prendre un peu plus de temps.','warning');
+                        this.xttsStatusNotifiedState='cold';
+                    }
+                }else{
+                    txt.textContent='Serveur clonage: hors ligne';
+                    badge.title='Service temporairement indisponible.';
+                    if(this.xttsStatusNotifiedState!=='offline'){
+                        showToast('Clonage','Serveur momentanément indisponible. Réessayez dans quelques instants.','warning');
+                        this.xttsStatusNotifiedState='offline';
+                    }
+                }
+                if(state==='ready') this.xttsStatusNotifiedState='ready';
+            }catch(_e){
+                badge.classList.remove('ready','cold');
+                badge.classList.add('offline');
+                txt.textContent='Serveur clonage: hors ligne';
+                badge.title='Impossible de vérifier le serveur.';
+            }
         }
 
         async loadTrialStatus(){

@@ -56,7 +56,7 @@ from functools import wraps
 
 from flask import (
     Flask, request, jsonify, session,
-    send_from_directory, render_template_string
+    send_from_directory, render_template_string, redirect
 )
 from supabase import create_client, Client
 from dotenv import load_dotenv
@@ -101,6 +101,9 @@ TRIAL_MAX_GENERATIONS = int(os.environ.get("TRIAL_MAX_GENERATIONS", "120"))
 DESKTOP_STABLE_VERSION = os.environ.get("DESKTOP_STABLE_VERSION", "4.1").strip()
 DESKTOP_DOWNLOAD_URL = os.environ.get("DESKTOP_DOWNLOAD_URL", "").strip()
 DESKTOP_CHANGELOG_URL = os.environ.get("DESKTOP_CHANGELOG_URL", "").strip()
+DESKTOP_DOWNLOAD_SHA256 = os.environ.get("DESKTOP_DOWNLOAD_SHA256", "").strip().lower()
+DESKTOP_FORCE_UPDATE = os.environ.get("DESKTOP_FORCE_UPDATE", "0").strip() in {"1", "true", "yes", "on"}
+DESKTOP_MINIMUM_VERSION = os.environ.get("DESKTOP_MINIMUM_VERSION", "").strip()
 
 
 def _jwt_payload(token: str) -> dict:
@@ -167,6 +170,7 @@ STORAGE_BUCKET = "voice-references"
 _storage_bucket_checked = False
 _last_xtts_warmup_ts = 0.0
 _xtts_warmup_lock = threading.Lock()
+_xtts_status_cache = {"ts": 0.0, "payload": None}
 
 
 def ensure_storage_bucket() -> None:
@@ -317,6 +321,59 @@ def prewarm_xtts_async(force: bool = False, cooldown_seconds: int = 90) -> None:
             pass
 
     threading.Thread(target=_runner, daemon=True).start()
+
+
+def _get_xtts_runtime_status(force: bool = False) -> dict:
+    """
+    Retourne l'état runtime du serveur XTTS:
+    - online: endpoint /health joignable
+    - warm: warmup récent (moins de 10 min)
+    - cold_start_likely: online mais pas warm
+    """
+    now = time.time()
+    if not force:
+        cached = _xtts_status_cache.get("payload")
+        ts = float(_xtts_status_cache.get("ts") or 0.0)
+        if cached and (now - ts) < 20.0:
+            return cached
+
+    online = False
+    status_code = 0
+    err = ""
+    try:
+        r = requests.get(f"{MODAL_XTTS_URL}/health", timeout=(2, 5))
+        status_code = int(r.status_code)
+        online = bool(r.ok)
+    except Exception as e:
+        err = str(e)
+
+    warm = (now - float(_last_xtts_warmup_ts or 0.0)) < 600.0
+    cold_start_likely = bool(online and not warm)
+
+    if not online:
+        state = "offline"
+        message = "Serveur clonage indisponible pour le moment."
+    elif cold_start_likely:
+        state = "cold"
+        message = "Serveur en veille: la première génération peut être plus lente."
+    else:
+        state = "ready"
+        message = "Serveur clonage prêt."
+
+    payload = {
+        "success": True,
+        "state": state,
+        "online": online,
+        "warm": warm,
+        "cold_start_likely": cold_start_likely,
+        "status_code": status_code,
+        "message": message,
+        "error": err,
+        "last_warmup_ts": int(_last_xtts_warmup_ts or 0),
+    }
+    _xtts_status_cache["ts"] = now
+    _xtts_status_cache["payload"] = payload
+    return payload
 
 
 def _get_trial_status_for_user(user: dict) -> dict:
@@ -770,6 +827,8 @@ def login():
 @app.route("/logout", methods=["GET", "POST"])
 def logout():
     session.clear()
+    if request.method == "GET":
+        return redirect("/")
     return jsonify({"success": True})
 
 
@@ -821,6 +880,12 @@ def trial_status():
 def xtts_warmup():
     prewarm_xtts_async(force=True, cooldown_seconds=10)
     return jsonify({"success": True, "message": "XTTS warmup lancé"})
+
+
+@app.route("/api/xtts/status", methods=["GET"])
+@login_required
+def xtts_status():
+    return jsonify(_get_xtts_runtime_status(force=False))
 
 
 # =============================================================================
@@ -1012,15 +1077,17 @@ def activate_desktop_trial_license():
             })
         return jsonify({"ok": False, "error": "Essai introuvable"}), 404
 
-    # Création d'un nouvel essai
+    # Création d'un nouvel essai (2 passes pour éviter les faux blocages liés à l'ordre DB)
+    # Pass 1: si le couple (email + hwid) existe déjà, on le réutilise.
+    exact_match_found = False
     for row in rows:
         row_email = (row.get("activated_by_email") or "").strip().lower()
         row_hwids = _hwid_list((row.get("desktop_hwid") or "").strip())
         row_key = (row.get("key_value") or "").strip().upper()
         row_exp = (row.get("expiration") or "").strip()
 
-        # Même couple => renvoyer la même clé (réinstallation)
         if row_email == email and hwid in row_hwids and row_key:
+            exact_match_found = True
             chk = verify_trial_desktop_key(row_key)
             if chk["valid"] and not chk["expired"]:
                 return jsonify({
@@ -1030,12 +1097,18 @@ def activate_desktop_trial_license():
                     "voice_license_key": row_key,
                     "expiration": row_exp or datetime.utcfromtimestamp(chk["expiration_ts"]).strftime("%d/%m/%Y"),
                 })
+            # Couple reconnu mais essai expiré.
+            return jsonify({"ok": False, "error": "Essai expiré pour cet email/appareil"}), 409
 
-        # Anti-abus strict
-        if row_email == email:
-            return jsonify({"ok": False, "error": "Essai déjà utilisé avec cet email"}), 409
-        if hwid in row_hwids:
-            return jsonify({"ok": False, "error": "Essai déjà utilisé sur cet appareil"}), 409
+    # Pass 2: anti-abus strict uniquement si aucun couple exact n'a été trouvé.
+    if not exact_match_found:
+        for row in rows:
+            row_email = (row.get("activated_by_email") or "").strip().lower()
+            row_hwids = _hwid_list((row.get("desktop_hwid") or "").strip())
+            if row_email == email:
+                return jsonify({"ok": False, "error": "Essai déjà utilisé avec cet email"}), 409
+            if hwid in row_hwids:
+                return jsonify({"ok": False, "error": "Essai déjà utilisé sur cet appareil"}), 409
 
     expiration_ts = int(time.time()) + 24 * 3600
     rand = uuid.uuid4().hex[:4].upper()
@@ -1720,6 +1793,9 @@ def update_check_desktop():
         "update_available": update_available,
         "download_url": DESKTOP_DOWNLOAD_URL,
         "changelog_url": DESKTOP_CHANGELOG_URL,
+        "download_sha256": DESKTOP_DOWNLOAD_SHA256,
+        "force_update": DESKTOP_FORCE_UPDATE,
+        "minimum_version": DESKTOP_MINIMUM_VERSION,
         "message": f"Nouvelle version disponible: {latest}" if update_available else "Vous êtes à jour.",
     })
 
