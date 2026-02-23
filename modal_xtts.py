@@ -20,6 +20,9 @@ from __future__ import annotations
 
 import os
 import tempfile
+import time
+import wave
+import functools
 from pathlib import Path
 
 import modal
@@ -27,14 +30,20 @@ from fastapi import File, Form, UploadFile
 from fastapi.responses import JSONResponse, Response
 
 
+tts_cache = modal.Volume.from_name("kommz-xtts-cache", create_if_missing=True)
+
 image = (
     modal.Image.debian_slim(python_version="3.11")
     .apt_install("ffmpeg")
     .env({"COQUI_TOS_AGREED": "1"})
     .pip_install(
         "TTS==0.22.0",
-        "torch",
-        "torchaudio",
+        # Keep transformers/tokenizers compatible with Coqui TTS 0.22.0 (XTTS v2).
+        "transformers==4.39.3",
+        "tokenizers==0.15.2",
+        # Torch 2.6+ changes torch.load(weights_only=True by default) and breaks XTTS checkpoints.
+        "torch==2.5.1",
+        "torchaudio==2.5.1",
         "numpy",
         "soundfile",
         "fastapi",
@@ -53,15 +62,57 @@ XTTS_IDLE_TIMEOUT = int(os.environ.get("XTTS_IDLE_TIMEOUT", "300"))
     memory=16384,
     scaledown_window=XTTS_IDLE_TIMEOUT,
     min_containers=XTTS_MIN_CONTAINERS,
+    volumes={"/root/.local/share/tts": tts_cache},
 )
 class XTTSModel:
+    @staticmethod
+    def _wav_duration_seconds(wav_bytes: bytes) -> float:
+        try:
+            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+                tmp.write(wav_bytes)
+                tmp_path = tmp.name
+            try:
+                with wave.open(tmp_path, "rb") as wf:
+                    frames = wf.getnframes()
+                    rate = wf.getframerate() or 1
+                    return float(frames) / float(rate)
+            finally:
+                try:
+                    os.remove(tmp_path)
+                except Exception:
+                    pass
+        except Exception:
+            return 0.0
+
     def _ensure_model(self):
         if hasattr(self, "tts"):
             return
         # Non-interactive containers (Modal) cannot answer input() prompts.
         os.environ.setdefault("COQUI_TOS_AGREED", "1")
+        # Compatibility guard for Coqui XTTS checkpoints with PyTorch weights_only behavior.
+        try:
+            import torch
+            _torch_load = torch.load
+
+            @functools.wraps(_torch_load)
+            def _compat_torch_load(*args, **kwargs):
+                kwargs.setdefault("weights_only", False)
+                return _torch_load(*args, **kwargs)
+
+            torch.load = _compat_torch_load  # type: ignore[assignment]
+        except Exception:
+            pass
         from TTS.api import TTS
-        self.tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2")
+        # Force GPU usage on A10G container; fallback to CPU only if CUDA unavailable.
+        try:
+            import torch
+            use_gpu = bool(torch.cuda.is_available())
+            if use_gpu:
+                torch.set_float32_matmul_precision("high")
+        except Exception:
+            use_gpu = False
+        self.tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2", gpu=use_gpu)
+        print(f"[XTTS] device={'cuda' if use_gpu else 'cpu'} pid={os.getpid()}")
 
     @modal.enter()
     def load(self):
@@ -80,6 +131,7 @@ class XTTSModel:
         import soundfile as sf
 
         self._ensure_model()
+        t0 = time.perf_counter()
 
         language = (language or "fr").strip().lower()
         if not text or not text.strip():
@@ -120,7 +172,16 @@ class XTTSModel:
                 final_path = final_wav.name
             sf.write(final_path, pcm16, sr, subtype="PCM_16")
             with open(final_path, "rb") as f:
-                return f.read()
+                out_bytes = f.read()
+
+            elapsed = max(0.001, time.perf_counter() - t0)
+            audio_sec = self._wav_duration_seconds(out_bytes)
+            rtf = (elapsed / audio_sec) if audio_sec > 0 else 0.0
+            print(
+                f"[XTTS] synth_time={elapsed:.3f}s audio={audio_sec:.3f}s "
+                f"rtf={rtf:.3f} lang={language} chars={len(text)} speed={speed:.2f}"
+            )
+            return out_bytes
         finally:
             for p in (speaker_path, out_path):
                 try:
@@ -137,12 +198,15 @@ class XTTSModel:
         self._ensure_model()
         return {"ready": bool(hasattr(self, "tts")), "model": "xtts_v2"}
 
+xtts_actor = XTTSModel()
+
 
 @app.function(
     image=image,
     timeout=600,
     scaledown_window=XTTS_IDLE_TIMEOUT,
     min_containers=XTTS_MIN_CONTAINERS,
+    volumes={"/root/.local/share/tts": tts_cache},
 )
 @modal.fastapi_endpoint(method="POST")
 async def clone(
@@ -161,8 +225,7 @@ async def clone(
         return JSONResponse(status_code=400, content={"error": "speaker_wav is empty"})
 
     try:
-        model = XTTSModel()
-        wav_bytes = model.clone.remote(
+        wav_bytes = await xtts_actor.clone.remote.aio(
             text=text.strip(),
             speaker_wav_bytes=speaker_bytes,
             speaker_filename=speaker_wav.filename or "speaker.wav",
@@ -177,21 +240,21 @@ async def clone(
 
 @app.function(
     image=image,
-    timeout=120,
+    timeout=900,
     scaledown_window=XTTS_IDLE_TIMEOUT,
     min_containers=XTTS_MIN_CONTAINERS,
+    volumes={"/root/.local/share/tts": tts_cache},
 )
 @modal.fastapi_endpoint(method="POST")
 async def warmup():
     try:
-        model = XTTSModel()
-        data = model.warmup.remote()
+        data = await xtts_actor.warmup.remote.aio()
         return JSONResponse(content={"status": "ok", **(data or {})})
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": f"warmup failed: {e}"})
 
 
-@app.function(image=image)
+@app.function(image=image, volumes={"/root/.local/share/tts": tts_cache})
 @modal.fastapi_endpoint(method="GET")
 async def health():
     return JSONResponse(
