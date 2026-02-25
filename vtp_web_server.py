@@ -46,6 +46,8 @@ import uuid
 import hashlib
 import hmac
 import time
+import re
+import ipaddress
 import tempfile
 import base64
 import json as pyjson
@@ -133,6 +135,10 @@ ADMIN_SECRET = os.environ.get("ADMIN_SECRET", "").strip()
 TRIAL_WINDOW_HOURS = int(os.environ.get("TRIAL_WINDOW_HOURS", "24"))
 TRIAL_MAX_AUDIO_SECONDS = int(os.environ.get("TRIAL_MAX_AUDIO_SECONDS", "1800"))  # 30 min
 TRIAL_MAX_GENERATIONS = int(os.environ.get("TRIAL_MAX_GENERATIONS", "120"))
+TRIAL_REGISTER_RATE_LIMIT_PER_10MIN = int(os.environ.get("TRIAL_REGISTER_RATE_LIMIT_PER_10MIN", "6"))
+TRIAL_ACTIVATE_RATE_LIMIT_PER_10MIN = int(os.environ.get("TRIAL_ACTIVATE_RATE_LIMIT_PER_10MIN", "12"))
+TRIAL_GUARD_WINDOW_SECONDS = int(os.environ.get("TRIAL_GUARD_WINDOW_SECONDS", "600"))
+TRIAL_GUARD_ENABLED = os.environ.get("TRIAL_GUARD_ENABLED", "1").strip().lower() in {"1", "true", "yes", "on"}
 
 # Desktop update channel (Kommz Gamer)
 DESKTOP_STABLE_VERSION = os.environ.get("DESKTOP_STABLE_VERSION", "4.1").strip()
@@ -208,6 +214,12 @@ _storage_bucket_checked = False
 _last_xtts_warmup_ts = 0.0
 _xtts_warmup_lock = threading.Lock()
 _xtts_status_cache = {"ts": 0.0, "payload": None}
+_request_guards = {}
+_request_guards_lock = threading.Lock()
+_last_trial_guard_cleanup_ts = 0.0
+
+EMAIL_RE = re.compile(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$")
+HWID_RE = re.compile(r"^[A-Z0-9._:-]{8,128}$")
 
 
 def ensure_storage_bucket() -> None:
@@ -312,6 +324,107 @@ def _get_client_ip() -> str:
 def _stable_hash(value: str) -> str:
     seed = f"{ADMIN_SECRET}|{value or ''}"
     return hashlib.sha256(seed.encode("utf-8")).hexdigest()
+
+
+def _clean_email(email: str) -> str:
+    return (email or "").strip().lower()
+
+
+def _is_valid_email(email: str) -> bool:
+    return bool(EMAIL_RE.match(_clean_email(email)))
+
+
+def _is_valid_hwid(hwid: str) -> bool:
+    return bool(HWID_RE.match((hwid or "").strip().upper()))
+
+
+def _ip_prefix(ip: str) -> str:
+    """Retourne un préfixe réseau stable (IPv4 /24, IPv6 /64)."""
+    raw = (ip or "").strip()
+    try:
+        parsed = ipaddress.ip_address(raw)
+        if parsed.version == 4:
+            net = ipaddress.ip_network(f"{parsed}/24", strict=False)
+        else:
+            net = ipaddress.ip_network(f"{parsed}/64", strict=False)
+        return str(net.network_address)
+    except Exception:
+        return raw or "0.0.0.0"
+
+
+def _too_many_attempts(scope: str, key: str, max_attempts: int, window_seconds: int = 600) -> bool:
+    """Rate-limit mémoire (best effort)."""
+    if max_attempts <= 0:
+        return False
+    now = time.time()
+    bucket_key = f"{scope}:{key}"
+    with _request_guards_lock:
+        hits = _request_guards.get(bucket_key, [])
+        cutoff = now - float(window_seconds)
+        hits = [ts for ts in hits if ts >= cutoff]
+        blocked = len(hits) >= int(max_attempts)
+        if not blocked:
+            hits.append(now)
+        _request_guards[bucket_key] = hits
+        return blocked
+
+
+def _too_many_attempts_persistent(scope: str, key: str, max_attempts: int, window_seconds: int = 600) -> bool:
+    """Rate-limit persistant en DB (compatible multi-instance)."""
+    global _last_trial_guard_cleanup_ts
+    if not TRIAL_GUARD_ENABLED or max_attempts <= 0:
+        return False
+    # Purge opportuniste des anciennes lignes (au plus 1 fois / heure).
+    now = time.time()
+    if (now - _last_trial_guard_cleanup_ts) > 3600:
+        try:
+            cutoff_iso = (datetime.utcnow() - timedelta(days=2)).isoformat()
+            supabase.table("license_keys").delete().eq("product", "trial_guard").lt("activated_at", cutoff_iso).execute()
+            _last_trial_guard_cleanup_ts = now
+        except Exception:
+            pass
+
+    guard_id = _stable_hash(f"{scope}:{key}")[:24]
+    now_iso = datetime.utcnow().isoformat()
+    since_iso = (datetime.utcnow() - timedelta(seconds=max(60, int(window_seconds)))).isoformat()
+    try:
+        rows = (
+            supabase.table("license_keys")
+            .select("key_value")
+            .eq("product", "trial_guard")
+            .eq("activated_by_user_id", guard_id)
+            .gte("activated_at", since_iso)
+            .limit(int(max_attempts) + 1)
+            .execute()
+        )
+        count = len(rows.data or [])
+        if count >= int(max_attempts):
+            return True
+
+        # On journalise la tentative pour les prochaines instances/process.
+        attempt_key = f"TRIAL-GUARD-{int(time.time())}-{uuid.uuid4().hex[:8].upper()}"
+        supabase.table("license_keys").insert({
+            "key_value": attempt_key,
+            "product": "trial_guard",
+            "is_activated": True,
+            "activated_by_email": "trial_guard",
+            "activated_by_user_id": guard_id,
+            "activated_at": now_iso,
+            "expiration": datetime.utcfromtimestamp(time.time() + max(60, int(window_seconds))).strftime("%d/%m/%Y"),
+        }).execute()
+        return False
+    except Exception:
+        # Fallback mémoire si DB indisponible.
+        return _too_many_attempts(scope, key, max_attempts, window_seconds=window_seconds)
+
+
+def _trial_signature(expiration_ts: int, rand: str, scope: str) -> str:
+    material = f"{int(expiration_ts)}|{rand}|{scope}"
+    return hmac.new(
+        (DESKTOP_SECRET_SALT or VOICE_SECRET_SALT or "dev-trial-salt").encode("utf-8"),
+        material.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()[:16].upper()
 
 
 def _estimate_audio_seconds(text: str, speed: float = 1.0) -> int:
@@ -556,11 +669,15 @@ def verify_trial_desktop_key(key: str) -> dict:
         return {"valid": False, "expired": False, "expiration_ts": 0}
 
     sig_upper = sig.upper()
-    expected_ts_rand_salt = hashlib.sha256(f"{ts_str}{rand}{DESKTOP_SECRET_SALT}".encode()).hexdigest()[:8].upper()
-    expected_salt_ts_rand = hashlib.sha256(f"{DESKTOP_SECRET_SALT}{ts_str}{rand}".encode()).hexdigest()[:8].upper()
+    if len(sig_upper) < 8:
+        return {"valid": False, "expired": False, "expiration_ts": 0}
+    expected_new = _trial_signature(expiration_ts, rand, "desktop")
+    # Compat héritage: anciennes clés 8 chars.
+    expected_old_a = hashlib.sha256(f"{ts_str}{rand}{DESKTOP_SECRET_SALT}".encode()).hexdigest()[:8].upper()
+    expected_old_b = hashlib.sha256(f"{DESKTOP_SECRET_SALT}{ts_str}{rand}".encode()).hexdigest()[:8].upper()
     if not (
-        hmac.compare_digest(sig_upper, expected_ts_rand_salt)
-        or hmac.compare_digest(sig_upper, expected_salt_ts_rand)
+        hmac.compare_digest(sig_upper, expected_new)
+        or (len(sig_upper) == 8 and (hmac.compare_digest(sig_upper, expected_old_a) or hmac.compare_digest(sig_upper, expected_old_b)))
     ):
         return {"valid": False, "expired": False, "expiration_ts": 0}
 
@@ -700,11 +817,22 @@ def register():
 def register_trial():
     """Création d'un compte essai gratuit avec anti-abus."""
     data = request.get_json() or {}
-    email = (data.get("email") or "").strip().lower()
+    email = _clean_email(data.get("email") or "")
     password = (data.get("password") or "").strip()
     trial_fingerprint_raw = (data.get("trial_fingerprint") or "").strip()
+    client_ip = _get_client_ip()
+    ip_hint = _ip_prefix(client_ip)
 
-    if not email or "@" not in email:
+    if _too_many_attempts("trial_register_ip", ip_hint, TRIAL_REGISTER_RATE_LIMIT_PER_10MIN, window_seconds=TRIAL_GUARD_WINDOW_SECONDS):
+        return jsonify({"success": False, "error": "Trop de tentatives, réessayez dans 10 minutes"}), 429
+    if _too_many_attempts("trial_register_email", email or "empty", TRIAL_REGISTER_RATE_LIMIT_PER_10MIN, window_seconds=TRIAL_GUARD_WINDOW_SECONDS):
+        return jsonify({"success": False, "error": "Trop de tentatives, réessayez dans 10 minutes"}), 429
+    if _too_many_attempts_persistent("trial_register_ip", ip_hint, TRIAL_REGISTER_RATE_LIMIT_PER_10MIN, window_seconds=TRIAL_GUARD_WINDOW_SECONDS):
+        return jsonify({"success": False, "error": "Trop de tentatives, réessayez dans 10 minutes"}), 429
+    if _too_many_attempts_persistent("trial_register_email", email or "empty", TRIAL_REGISTER_RATE_LIMIT_PER_10MIN, window_seconds=TRIAL_GUARD_WINDOW_SECONDS):
+        return jsonify({"success": False, "error": "Trop de tentatives, réessayez dans 10 minutes"}), 429
+
+    if not _is_valid_email(email):
         return jsonify({"success": False, "error": "Email invalide"}), 400
     if len(password) < 8:
         return jsonify({"success": False, "error": "Mot de passe trop court (8 caractères min)"}), 400
@@ -716,10 +844,12 @@ def register_trial():
     except Exception as e:
         return jsonify({"success": False, "error": f"Erreur DB: {e}"}), 500
 
-    client_ip = _get_client_ip()
-    trial_fp_base = trial_fingerprint_raw or f"{request.user_agent.string}|{request.headers.get('Accept-Language', '')}"
+    # Empreinte serveur: ne jamais dépendre uniquement d'un fingerprint client modifiable.
+    ua = (request.user_agent.string or "").strip()
+    al = (request.headers.get("Accept-Language") or "").strip()
+    trial_fp_base = f"ip:{ip_hint}|ua:{ua}|lang:{al}|client:{trial_fingerprint_raw[:256]}"
     fp_key = f"TRIAL-FP-{_stable_hash(f'fp:{trial_fp_base}')[:24]}"
-    ip_key = f"TRIAL-IP-{_stable_hash(f'ip:{client_ip}')[:24]}"
+    ip_key = f"TRIAL-IP-{_stable_hash(f'ip:{ip_hint}')[:24]}"
 
     try:
         by_email = (
@@ -752,7 +882,7 @@ def register_trial():
 
     trial_expiry_ts = int(time.time()) + (TRIAL_WINDOW_HOURS * 3600)
     trial_rand = uuid.uuid4().hex[:4].upper()
-    trial_sig = hashlib.sha256(f"{trial_expiry_ts}{trial_rand}{VOICE_SECRET_SALT}".encode()).hexdigest()[:8].upper()
+    trial_sig = _trial_signature(trial_expiry_ts, trial_rand, "web")
     trial_license = f"TRIAL-{trial_expiry_ts}-{trial_rand}-{trial_sig}"
 
     new_user = {
@@ -1069,10 +1199,20 @@ def activate_desktop_trial_license():
     """
     data = request.get_json() or {}
     key = (data.get("license_key") or "").strip().upper()
-    email = (data.get("email") or "").strip().lower()
+    email = _clean_email(data.get("email") or "")
     hwid = (data.get("hwid") or "").strip().upper()
+    ip_hint = _ip_prefix(_get_client_ip())
 
-    if not email or "@" not in email or not hwid:
+    if _too_many_attempts("trial_activate_ip", ip_hint, TRIAL_ACTIVATE_RATE_LIMIT_PER_10MIN, window_seconds=TRIAL_GUARD_WINDOW_SECONDS):
+        return jsonify({"ok": False, "error": "Trop de tentatives, réessayez dans 10 minutes"}), 429
+    if _too_many_attempts("trial_activate_email", email or "empty", TRIAL_ACTIVATE_RATE_LIMIT_PER_10MIN, window_seconds=TRIAL_GUARD_WINDOW_SECONDS):
+        return jsonify({"ok": False, "error": "Trop de tentatives, réessayez dans 10 minutes"}), 429
+    if _too_many_attempts_persistent("trial_activate_ip", ip_hint, TRIAL_ACTIVATE_RATE_LIMIT_PER_10MIN, window_seconds=TRIAL_GUARD_WINDOW_SECONDS):
+        return jsonify({"ok": False, "error": "Trop de tentatives, réessayez dans 10 minutes"}), 429
+    if _too_many_attempts_persistent("trial_activate_email", email or "empty", TRIAL_ACTIVATE_RATE_LIMIT_PER_10MIN, window_seconds=TRIAL_GUARD_WINDOW_SECONDS):
+        return jsonify({"ok": False, "error": "Trop de tentatives, réessayez dans 10 minutes"}), 429
+
+    if not _is_valid_email(email) or not _is_valid_hwid(hwid):
         return jsonify({"ok": False, "error": "Paramètres manquants"}), 400
 
     def _hwid_list(raw: str) -> list[str]:
@@ -1147,9 +1287,9 @@ def activate_desktop_trial_license():
             if hwid in row_hwids:
                 return jsonify({"ok": False, "error": "Essai déjà utilisé sur cet appareil"}), 409
 
-    expiration_ts = int(time.time()) + 24 * 3600
+    expiration_ts = int(time.time()) + (TRIAL_WINDOW_HOURS * 3600)
     rand = uuid.uuid4().hex[:4].upper()
-    sig = hashlib.sha256(f"{expiration_ts}{rand}{DESKTOP_SECRET_SALT}".encode()).hexdigest()[:8].upper()
+    sig = _trial_signature(expiration_ts, rand, "desktop")
     trial_key = f"TRIAL-{expiration_ts}-{rand}-{sig}"
     expiration_date = datetime.utcfromtimestamp(expiration_ts).strftime("%d/%m/%Y")
 
