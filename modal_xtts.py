@@ -37,19 +37,20 @@ image = (
     .apt_install("ffmpeg")
     .env({"COQUI_TOS_AGREED": "1"})
     .pip_install(
-        "TTS==0.22.0",
-        # Keep transformers/tokenizers compatible with Coqui TTS 0.22.0 (XTTS v2).
-        "transformers==4.39.3",
-        "tokenizers==0.15.2",
-        # Torch 2.6+ changes torch.load(weights_only=True by default) and breaks XTTS checkpoints.
-        "torch==2.5.1",
-        "torchaudio==2.5.1",
-        "numpy",
-        "soundfile",
-        "fastapi",
-        "python-multipart",
-    )
+    "TTS==0.22.0",
+    "transformers==4.39.3",
+    "tokenizers==0.15.2",
+    "torch==2.5.1",
+    "torchaudio==2.5.1",
+    "numpy",
+    "soundfile",
+    "fastapi",
+    "python-multipart",
+    "cutlet",
+    "fugashi",
+    "unidic-lite",
 )
+
 
 app = modal.App("kommz-voice-xtts", image=image)
 
