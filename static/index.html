@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
@@ -752,6 +752,13 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
                 document.getElementById('screen-license').classList.add('dn');
                 document.getElementById('screen-auth').classList.remove('dn');
                 switchAuthTab('register');
+                // Fallback: conserver la clé pour que /register reçoive bien license_key.
+                const hiddenKey = document.getElementById('hiddenLicenseKey');
+                const hiddenTrial = document.getElementById('hiddenTrialMode');
+                const hiddenFp = document.getElementById('hiddenTrialFingerprint');
+                if (hiddenKey) hiddenKey.value = key;
+                if (hiddenTrial) hiddenTrial.value = '0';
+                if (hiddenFp) hiddenFp.value = '';
             }, 1500);
         } finally {
             btn.textContent = 'Vérifier la licence →';
