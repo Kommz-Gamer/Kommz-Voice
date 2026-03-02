@@ -609,30 +609,15 @@ def verify_vcv_key(key: str) -> dict:
     except (ValueError, IndexError):
         return {"valid": False, "expired": False, "expiration_ts": 0}
 
-    # Vérification signature (compatibilité multi-sels / migrations Make).
-    # Priorité: sel runtime, puis éventuel legacy explicite, puis ancien sel Make public.
+    # VÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rification signature (compatibilitÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©: ancien + nouveau format)
     sig_upper = sig.upper()
-    candidate_salts = []
-    for raw in (
-        VOICE_SECRET_SALT,
-        os.environ.get("VOICE_SECRET_SALT_LEGACY", "").strip(),
-        "VTP-KOMMZ-VOICE-2026-X77",
+    expected_ts_rand_salt = hashlib.sha256(f"{ts_str}{rand}{VOICE_SECRET_SALT}".encode()).hexdigest()[:8].upper()
+    expected_salt_ts_rand = hashlib.sha256(f"{VOICE_SECRET_SALT}{ts_str}{rand}".encode()).hexdigest()[:8].upper()
+
+    if not (
+        hmac.compare_digest(sig_upper, expected_ts_rand_salt)
+        or hmac.compare_digest(sig_upper, expected_salt_ts_rand)
     ):
-        if raw and raw not in candidate_salts:
-            candidate_salts.append(raw)
-
-    if not candidate_salts:
-        return {"valid": False, "expired": False, "expiration_ts": 0}
-
-    signature_ok = False
-    for salt in candidate_salts:
-        expected_ts_rand_salt = hashlib.sha256(f"{ts_str}{rand}{salt}".encode()).hexdigest()[:8].upper()
-        expected_salt_ts_rand = hashlib.sha256(f"{salt}{ts_str}{rand}".encode()).hexdigest()[:8].upper()
-        if hmac.compare_digest(sig_upper, expected_ts_rand_salt) or hmac.compare_digest(sig_upper, expected_salt_ts_rand):
-            signature_ok = True
-            break
-
-    if not signature_ok:
         return {"valid": False, "expired": False, "expiration_ts": 0}
 
     # VÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rification expiration
