@@ -134,7 +134,7 @@ class XTTSModel:
         self._ensure_model()
         t0 = time.perf_counter()
 
-        language = (language or "fr").strip().lower()
+        language = (language or "fr").strip().lower().split("-")[0]
         if not text or not text.strip():
             raise ValueError("text is required")
 
