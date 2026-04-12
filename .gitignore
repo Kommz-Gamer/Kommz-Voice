@@ -10,6 +10,8 @@ __pycache__/
 .env
 .env.*
 !.env.template
+settings.json
+settings.local.backup.json
 *.pem
 *.key
 *.p12
@@ -19,8 +21,18 @@ __pycache__/
 *.dump
 *.sql.gz
 *.bak
+log_discret.txt
+tmp_cv_extract.txt
 secrets/
 exports/
+
+# Temporary workspace artifacts
+.tmp_twilio_test/
+Pack_Streamio/
+bridge_push_clean/
+_stremiofr_home.html
+_stremiofr_index.js
+settings.example.json
 
 # OS/editor
 .DS_Store
