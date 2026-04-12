@@ -1,0 +1,24 @@
+title = "Kommz Voice gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Allow known non-secret placeholders used in docs/templates"
+regexes = [
+  '''CHANGE_ME''',
+  '''VOTRE_CLE_API''',
+  '''admin@example\.com''',
+  '''user@email\.com''',
+  '''votre@email\.com''',
+  '''example\.com''',
+  '''TRIAL-[0-9A-Z-]+''',
+]
+paths = [
+  '''^docs/.*''',
+  '''^CHANGELOG.*\.md$''',
+  '''^release-template.*\.md$''',
+  '''^env\.template$''',
+  '''^env\.production\.template$''',
+]
+
