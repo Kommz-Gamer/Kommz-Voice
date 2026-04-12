@@ -4,3 +4,5 @@ supabase
 python-dotenv
 requests
 gunicorn
+twilio
+bcrypt

@@ -17,7 +17,7 @@
     --font:'DM Sans',sans-serif;--mono:'JetBrains Mono',monospace;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
-body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:100vh;overflow:hidden;font-size:.875rem;zoom:1.1;}
+body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:100vh;overflow:hidden;font-size:.875rem;zoom:1;}
 ::-webkit-scrollbar{width:4px;}::-webkit-scrollbar-track{background:transparent;}
 ::-webkit-scrollbar-thumb{background:#2a2a3a;border-radius:10px;}
 ::-webkit-scrollbar-thumb:hover{background:var(--violet);}
@@ -41,7 +41,7 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
 
 /* DASHBOARD */
 .dashboard{display:flex;height:100vh;}
-.sidebar{width:220px;background:var(--bg-surface);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:22px 14px;flex-shrink:0;}
+.sidebar{width:220px;background:var(--bg-surface);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:22px 14px;flex-shrink:0;overflow-y:auto;}
 .brand{display:flex;align-items:center;gap:12px;padding:0 4px;margin-bottom:32px;}
 .brand-icon{width:40px;height:40px;background:linear-gradient(135deg,var(--violet),var(--cyan-dark));border-radius:12px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1.1rem;flex-shrink:0;}
 .brand-name{font-weight:800;font-size:.95rem;letter-spacing:-.02em;color:#fff;}
@@ -58,6 +58,8 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
 .user-status{font-size:.55rem;font-weight:700;color:var(--green);letter-spacing:.08em;text-transform:uppercase;font-family:var(--font);}
 .logout-btn{background:none;border:none;color:var(--muted);cursor:pointer;padding:4px;border-radius:6px;transition:color .2s;}
 .logout-btn:hover{color:var(--red);}
+.logout-action{margin-top:8px;width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:rgba(239,68,68,.08);color:#fecaca;text-decoration:none;font-size:.75rem;font-weight:700;cursor:pointer;}
+.logout-action:hover{background:rgba(239,68,68,.16);color:#fee2e2;}
 .trial-card{margin-top:10px;padding:10px 12px;background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.25);border-radius:12px;}
 .trial-title{font-family:var(--font);font-size:.58rem;color:var(--violet-light);font-weight:700;letter-spacing:.08em;text-transform:uppercase;}
 .trial-main{margin-top:6px;font-size:.72rem;color:#fff;font-weight:700;}
@@ -65,6 +67,20 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
 
 /* MAIN */
 .main-view{flex:1;overflow:hidden;display:flex;flex-direction:column;background:radial-gradient(ellipse at top right,#0d0d18 0%,var(--bg-void) 60%);}
+.secure-view{height:100%;overflow-y:auto;padding:28px 36px 34px;}
+.secure-wrap{max-width:860px;}
+.secure-title{font-size:1.7rem;font-weight:800;letter-spacing:-.03em;margin-bottom:6px;}
+.secure-sub{font-size:.8rem;color:var(--muted);margin-bottom:20px;}
+.secure-card{background:var(--bg-panel);border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:14px;}
+.secure-row{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end;}
+.secure-label{font-size:.65rem;color:var(--muted);font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px;display:block;}
+.secure-select,.secure-input,.secure-textarea{width:100%;background:var(--bg-input);border:1px solid var(--border);color:#fff;border-radius:10px;padding:10px 12px;font-family:var(--font);}
+.secure-textarea{min-height:140px;resize:vertical;}
+.secure-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;}
+.secure-btn{border:1px solid var(--border);background:var(--bg-input);color:#fff;padding:10px 14px;border-radius:10px;font-weight:700;font-size:.78rem;cursor:pointer;}
+.secure-btn.primary{background:linear-gradient(135deg,var(--violet),#4f46e5);border-color:rgba(124,58,237,.35);}
+.secure-btn.warn{background:rgba(245,158,11,.15);border-color:rgba(245,158,11,.35);color:#fde68a;}
+.secure-note{font-size:.72rem;color:var(--muted-light);}
 
 /* ==============================
    VOICE LAB
@@ -230,6 +246,18 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
 .toast-title{font-weight:700;font-size:.78rem;color:#fff;}
 .toast-msg{font-size:.72rem;color:var(--muted-light);margin-top:1px;}
 .dn{display:none!important;}
+
+/* Compact mode: keep logout visible on smaller heights */
+@media (max-height: 920px){
+    .sidebar{padding:14px 10px;}
+    .brand{margin-bottom:18px;}
+    .nav-label{margin-bottom:6px;}
+    .nav-item{padding:8px 10px;font-size:.78rem;}
+    .sidebar-footer{padding-top:12px;}
+    .user-chip{padding:8px 10px;}
+    .logout-action{padding:7px 9px;font-size:.7rem;}
+    .trial-card{margin-top:8px;padding:8px 10px;}
+}
     </style>
 </head>
 <body>
@@ -374,12 +402,18 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
             <div id="nav-api" class="nav-item" onclick="switchTab('api')">
                 <i class="bi bi-cpu-fill"></i> Diamond API
             </div>
+            {% if secure_tts_enabled %}
+            <div id="nav-secure" class="nav-item" onclick="switchTab('secure')">
+                <i class="bi bi-shield-lock-fill"></i> Secure TTS
+            </div>
+            {% endif %}
             <div class="sidebar-footer">
                 <div class="user-chip">
                     <div class="user-avatar">{{ user.email[0]|upper }}</div>
                     <div style="flex:1;min-width:0;"><div class="user-email">{{ user.email }}</div><div class="user-status">Authentified ✓</div></div>
                     <a href="#" class="logout-btn" onclick="doLogout(event)"><i class="bi bi-power"></i></a>
                 </div>
+                <a href="#" class="logout-action" onclick="doLogout(event)"><i class="bi bi-box-arrow-right"></i> Déconnexion</a>
                 <div id="trialStatusCard" class="trial-card dn">
                     <div class="trial-title">Plan Essai</div>
                     <div class="trial-main" id="trialRemainingMain">Calcul...</div>
@@ -435,6 +469,43 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
   }'</pre></div>
                 </div>
             </div>
+            {% if secure_tts_enabled %}
+            <div id="view-secure" class="secure-view dn">
+                <div class="secure-wrap">
+                    <div class="secure-title">Secure TTS Multi-langue</div>
+                    <div class="secure-sub">Zone protégée par mot de passe pour synthèse locale navigateur.</div>
+                    <div class="secure-card" id="secureLockBox">
+                        <label class="secure-label" for="securePassword">Mot de passe</label>
+                        <div class="secure-row">
+                            <input id="securePassword" type="password" class="secure-input" placeholder="Entrer le mot de passe">
+                            <button class="secure-btn primary" onclick="unlockSecureTts()">Déverrouiller</button>
+                        </div>
+                        <div class="secure-note" style="margin-top:10px;">Accès requis pour activer l'onglet.</div>
+                    </div>
+                    <div class="secure-card dn" id="secureMainBox">
+                        <label class="secure-label" for="secureProfile">Voix Voice Lab</label>
+                        <select id="secureProfile" class="secure-select"></select>
+                        <label class="secure-label" for="secureLang">Langue cible</label>
+                        <select id="secureLang" class="secure-select">
+                            <option value="fr-FR">Français</option>
+                            <option value="en-US">English</option>
+                            <option value="ja-JP">日本語</option>
+                            <option value="es-ES">Español</option>
+                            <option value="de-DE">Deutsch</option>
+                            <option value="it-IT">Italiano</option>
+                            <option value="pt-PT">Português</option>
+                        </select>
+                        <label class="secure-label" for="secureText" style="margin-top:12px;">Texte</label>
+                        <textarea id="secureText" class="secure-textarea" placeholder="Tape ton texte ici..."></textarea>
+                        <div class="secure-actions">
+                            <button class="secure-btn primary" onclick="secureSpeakLab()">Lire en Qualite Max (XTTS)</button>
+                            <button class="secure-btn warn" onclick="secureStop()">Stop</button>
+                        </div>
+                        <div class="secure-note" style="margin-top:10px;">Mode qualite max: XTTS Voice Lab uniquement (stabilite + fidelite).</div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
         </div>
     </div>
 
@@ -752,6 +823,13 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
                 document.getElementById('screen-license').classList.add('dn');
                 document.getElementById('screen-auth').classList.remove('dn');
                 switchAuthTab('register');
+                // Fallback: conserver la clé pour que /register reçoive bien license_key.
+                const hiddenKey = document.getElementById('hiddenLicenseKey');
+                const hiddenTrial = document.getElementById('hiddenTrialMode');
+                const hiddenFp = document.getElementById('hiddenTrialFingerprint');
+                if (hiddenKey) hiddenKey.value = key;
+                if (hiddenTrial) hiddenTrial.value = '0';
+                if (hiddenFp) hiddenFp.value = '';
             }, 1500);
         } finally {
             btn.textContent = 'Vérifier la licence →';
@@ -796,9 +874,11 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
 
     /* === NAV === */
     function switchTab(tab){
-        ['lab','api'].forEach(k=>{
-            document.getElementById('view-'+k).classList.toggle('dn',k!==tab);
-            document.getElementById('nav-'+k).classList.toggle('active',k===tab);
+        ['lab','api','secure'].forEach(k=>{
+            const view = document.getElementById('view-'+k);
+            const nav = document.getElementById('nav-'+k);
+            if(view) view.classList.toggle('dn',k!==tab);
+            if(nav) nav.classList.toggle('active',k===tab);
         });
         if(tab==='lab')window.app?.loadProfiles();
     }
@@ -808,8 +888,6 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
         window.app?.resetWizard();
         goStep(1);
         new bootstrap.Modal(document.getElementById('wizModal')).show();
-        // Pre-warm moteur vocal in background to reduce first-generation latency.
-        fetch('/api/xtts/warmup', {method:'POST'}).catch(()=>{});
     }
     function goStep(n){
         [1,2].forEach(i=>{
@@ -840,6 +918,187 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
         window.location.href='/';
     }
 
+    const SECURE_TTS_PREUNLOCKED = {% if secure_tts_unlocked %}true{% else %}false{% endif %};
+    let secureUnlocked = SECURE_TTS_PREUNLOCKED;
+    let secureStopRequested = false;
+    let secureCurrentAudio = null;
+
+    function applySecureUnlockUi(){
+        if(!secureUnlocked) return;
+        document.getElementById('secureLockBox')?.classList.add('dn');
+        document.getElementById('secureMainBox')?.classList.remove('dn');
+        refreshSecureProfileOptions();
+    }
+
+    async function unlockSecureTts(){
+        const input = document.getElementById('securePassword');
+        if(!input) return;
+        const password = (input.value || '').trim();
+        if(!password){
+            showToast('Secure TTS','Mot de passe requis.','warning');
+            return;
+        }
+        try{
+            const r = await fetch('/api/secure-tts/unlock', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json'},
+                credentials: 'same-origin',
+                body: JSON.stringify({password})
+            });
+            const d = await r.json().catch(() => ({}));
+            if(!r.ok || !d?.success){
+                throw new Error(d?.error || `Erreur HTTP ${r.status}`);
+            }
+        }catch(_e){
+            showToast('Secure TTS','Mot de passe invalide.','error');
+            return;
+        }
+        secureUnlocked = true;
+        applySecureUnlockUi();
+        showToast('Secure TTS','Accès autorisé.','success');
+    }
+
+    function normalizeXttsLang(langTag){
+        const short = String(langTag || 'fr-FR').split('-')[0].toLowerCase();
+        const allowed = new Set(['fr','en','ja','es','de','it','pt','ru','ko','zh']);
+        return allowed.has(short) ? short : 'fr';
+    }
+
+    function chunkTextForXtts(text, maxLen=180){
+        const cleaned = String(text || '').replace(/\s+/g, ' ').trim();
+        if(!cleaned) return [];
+        const sentences = cleaned.split(/(?<=[\.\!\?\n;:])\s+/).filter(Boolean);
+        const chunks = [];
+        let current = '';
+        for(const s of sentences){
+            if(!current){
+                current = s;
+                continue;
+            }
+            if((current.length + 1 + s.length) <= maxLen){
+                current += ' ' + s;
+            }else{
+                chunks.push(current);
+                current = s;
+            }
+        }
+        if(current) chunks.push(current);
+        if(!chunks.length && cleaned) chunks.push(cleaned.slice(0, maxLen));
+        return chunks;
+    }
+
+    function normalizePromptText(text){
+        return String(text || '')
+            .replace(/\.{2,}/g, '.')
+            .replace(/([!?;,])\1+/g, '$1')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
+    function refreshSecureProfileOptions(){
+        const el = document.getElementById('secureProfile');
+        if(!el) return;
+        const profiles = Array.isArray(window.app?.profiles) ? window.app.profiles : [];
+        el.innerHTML = '';
+        if(!profiles.length){
+            const opt = document.createElement('option');
+            opt.value = '';
+            opt.textContent = 'Aucune voix disponible';
+            el.appendChild(opt);
+            return;
+        }
+        profiles.forEach((p) => {
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            opt.textContent = `${p.name || 'Sans nom'} (${(p.language || 'fr').toUpperCase()})`;
+            el.appendChild(opt);
+        });
+    }
+
+
+    async function secureSpeakLab(){
+        if(!secureUnlocked){
+            showToast('Secure TTS','Zone verrouillee.','warning');
+            return;
+        }
+        const profileId = document.getElementById('secureProfile')?.value || '';
+        const text = normalizePromptText(document.getElementById('secureText')?.value || '');
+        const lang = normalizeXttsLang(document.getElementById('secureLang')?.value || 'fr-FR');
+        if(!profileId){
+            showToast('Secure TTS','Choisissez une voix Voice Lab.','warning');
+            return;
+        }
+        if(!text){
+            showToast('Secure TTS','Texte requis.','warning');
+            return;
+        }
+        try{
+            secureStopRequested = false;
+            const chunks = chunkTextForXtts(text, 180);
+            if(!chunks.length){
+                throw new Error('Texte invalide.');
+            }
+
+            showToast('Secure TTS', 'Generation XTTS qualite max: ' + chunks.length + ' segment(s)...', 'info');
+            const urls = [];
+            for(let i=0; i<chunks.length; i++){
+                if(secureStopRequested) break;
+                const r = await fetch('/api/generate',{
+                    method:'POST',
+                    headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify({
+                        text: chunks[i],
+                        profile_id: profileId,
+                        language: lang,
+                        speed: 1.04,
+                        temperature: 0.20
+                    })
+                });
+                const d = await r.json();
+                if(!r.ok || !d?.success){
+                    throw new Error(d?.error || `Erreur HTTP ${r.status}`);
+                }
+                if(!d.audio_url){
+                    throw new Error('Audio genere mais URL indisponible.');
+                }
+                urls.push(d.audio_url + (d.audio_url.includes('?') ? '&' : '?') + 't=' + Date.now() + '_' + i);
+            }
+
+            for(const url of urls){
+                if(secureStopRequested) break;
+                secureCurrentAudio = new Audio(url);
+                await new Promise((resolve, reject) => {
+                    if(!secureCurrentAudio) return reject(new Error('Audio indisponible.'));
+                    secureCurrentAudio.oncanplay = () => resolve();
+                    secureCurrentAudio.onerror = () => reject(new Error('URL audio invalide ou format non supporte.'));
+                    secureCurrentAudio.load();
+                });
+                await secureCurrentAudio.play();
+                await new Promise((resolve) => {
+                    if(!secureCurrentAudio) return resolve();
+                    secureCurrentAudio.onended = () => resolve();
+                });
+            }
+            secureCurrentAudio = null;
+            if(!secureStopRequested){
+                showToast('Secure TTS','Lecture XTTS terminee.','success');
+            }
+        }catch(e){
+            secureCurrentAudio = null;
+            showToast('Secure TTS', e.message || 'Generation impossible.', 'error');
+        }
+    }
+    function secureStop(){
+        secureStopRequested = true;
+        if(secureCurrentAudio){
+            try{
+                secureCurrentAudio.pause();
+                secureCurrentAudio.currentTime = 0;
+            }catch(_e){}
+            secureCurrentAudio = null;
+        }
+    }
+
     /* === TOAST === */
     function showToast(title,msg,type='info'){
         const cfg={success:{i:'bi-check-circle-fill',c:'var(--green)'},error:{i:'bi-x-circle-fill',c:'var(--red)'},info:{i:'bi-info-circle-fill',c:'var(--violet-light)'},warning:{i:'bi-exclamation-triangle-fill',c:'var(--yellow)'}};
@@ -868,7 +1127,6 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
             document.addEventListener('click',()=>this.hideCtx());
             if(document.getElementById('voiceGrid')) this.loadProfiles();
             this.loadXttsStatus();
-            this._xttsStatusInterval = setInterval(()=>this.loadXttsStatus(), 25000);
             if(document.getElementById('trialStatusCard')){
                 this.loadTrialStatus();
                 this._trialInterval = setInterval(()=>this.loadTrialStatus(), 30000);
@@ -941,6 +1199,7 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
         async loadProfiles(){
             try{const r=await fetch('/api/profiles');const d=await r.json();this.profiles=d.profiles||[];this.renderGrid();const b=document.getElementById('profileBadge');if(b)b.textContent=this.profiles.length;}
             catch(e){console.warn('profiles:',e);}
+            refreshSecureProfileOptions();
         }
         renderGrid(){
             const grid=document.getElementById('voiceGrid');if(!grid)return;
@@ -1265,6 +1524,7 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
         const hasDashboard = !!document.getElementById('voiceGrid');
         const hasAuthFlow = !!document.getElementById('screen-license');
         if (hasDashboard || hasAuthFlow) window.app = new KommzApp();
+        applySecureUnlockUi();
     });
     </script>
 </body>

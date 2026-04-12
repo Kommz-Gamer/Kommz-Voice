@@ -27,3 +27,6 @@ exports/
 Thumbs.db
 .vscode/
 .idea/
+
+# External nested project (not part of KommzVoice deliverable)
+resin-site/

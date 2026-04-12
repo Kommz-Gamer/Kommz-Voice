@@ -23,6 +23,7 @@ COÛT ESTIMÉ :
 =============================================================================
 """
 
+import os
 import modal
 import io
 from fastapi import UploadFile, File, Form
@@ -47,14 +48,20 @@ image = (
 
 app = modal.App("kommz-whisper", image=image)
 
+WHISPER_GPU = os.getenv("WHISPER_GPU", "T4")
+WHISPER_MEMORY_MB = int(os.getenv("WHISPER_MEMORY_MB", "4096"))
+WHISPER_SCALEDOWN_WINDOW = int(os.getenv("WHISPER_SCALEDOWN_WINDOW", "900"))
+WHISPER_MIN_CONTAINERS = int(os.getenv("WHISPER_MIN_CONTAINERS", "0"))
+
 # =============================================================================
 # CLASSE WHISPER — Chargement du modèle au warm-up
 # =============================================================================
 
 @app.cls(
-    gpu="T4",                    # T4 suffit pour Whisper
-    container_idle_timeout=120,  # Garde le container chaud 2 minutes
-    memory=4096,                 # 4GB RAM
+    gpu=WHISPER_GPU,                          # T4 suffit pour Whisper
+    scaledown_window=WHISPER_SCALEDOWN_WINDOW,
+    min_containers=WHISPER_MIN_CONTAINERS,
+    memory=WHISPER_MEMORY_MB,
 )
 class WhisperModel:
 
@@ -131,7 +138,7 @@ class WhisperModel:
 
 @app.function(
     image=image,
-    container_idle_timeout=120,
+    scaledown_window=WHISPER_SCALEDOWN_WINDOW,
 )
 @modal.fastapi_endpoint(method="POST")
 async def transcribe(
@@ -162,7 +169,7 @@ async def transcribe(
     # Appel au modèle Whisper
     try:
         whisper_instance = WhisperModel()
-        result = whisper_instance.transcribe.remote(
+        result = await whisper_instance.transcribe.remote.aio(
             audio_bytes=audio_bytes,
             filename=audio.filename or "audio.wav",
             model_name=model,
