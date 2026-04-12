@@ -38,6 +38,8 @@ or when `SUPABASE_KEY` looks like an `anon` key.
 - Rotation and cutover: `docs/security-rotation-runbook.md`
 - Release checks: `docs/release-security-checklist.md`
 - Git history purge after key rotation: `scripts/purge-git-history.ps1`
+- Security policy (EN): `SECURITY.md`
+- Politique de securite (FR): `SECURITY.fr.md`
 
 ## Public links
 
