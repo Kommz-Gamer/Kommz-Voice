@@ -32,12 +32,6 @@ L'objectif de Kommz Voice est de proposer une base plus claire, plus modulaire e
 - meilleure séparation entre client et brique moteur
 - amélioration du support pour les usages temps réel
 
-### Liens
-- Community : https://github.com/Kommz-Gamer/Kommz-Gamer
-- Discord : https://discord.gg/uv25d6uGKZ
-- Patreon : https://www.patreon.com/KommzInnovations
-- Site : https://kommz.fr
-
 
 ## Ecosystem positioning
 
@@ -73,6 +67,7 @@ or when `SUPABASE_KEY` looks like an `anon` key.
 
 ## Public links
 
-- Community GitHub: https://github.com/Kommz-Gamer/Kommz-Gamer
-- Discord: https://discord.gg/uv25d6uGKZ
-- Patreon: https://www.patreon.com/KommzInnovations
+- Community : https://github.com/Kommz-Gamer/Kommz-Gamer
+- Discord : https://discord.gg/uv25d6uGKZ
+- Patreon : https://www.patreon.com/KommzInnovations
+- Site : https://kommz.fr
