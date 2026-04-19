@@ -25,6 +25,7 @@ It powers synthesis, transcription, and multi-engine routing for connected clien
 - Message guidelines: `docs/message-guidelines.md`
 - Security and rotation: `docs/security-rotation-runbook.md`
 - Release checklist: `docs/release-security-checklist.md`
+- Roadmap: `ROADMAP.en.md`
 
 ## Quick start
 
@@ -55,10 +56,14 @@ It powers synthesis, transcription, and multi-engine routing for connected clien
 - Discord: https://discord.gg/uv25d6uGKZ
 - Patreon: https://www.patreon.com/KommzInnovations
 
+## Contributing / Support
+
+- Contributing: `CONTRIBUTING.md`
+- Support: `SUPPORT.md`
+
 ## Releases
 
 Use these templates to standardize release notes:
 
 - French: `release-template.fr.md`
 - English: `release-template.en.md`
-

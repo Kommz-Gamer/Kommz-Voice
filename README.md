@@ -63,10 +63,14 @@ Elle alimente les flux de **transcription**, **traduction** (via client) et **sy
 - Patreon : https://www.patreon.com/KommzInnovations
 - Site : https://kommz.fr
 
+## Contribuer / Support
+
+- Contribuer : `CONTRIBUTING.md`
+- Support : `SUPPORT.md`
+
 ## Releases
 
 Pour standardiser les notes de version :
 
 - Français : `release-template.fr.md`
 - English : `release-template.en.md`
-
