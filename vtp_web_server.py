@@ -1679,6 +1679,19 @@ def activate_desktop_trial_license():
             if hwid in row_hwids:
                 return jsonify({"ok": False, "error": "Essai dÃ©jÃ  utilisÃ© sur cet appareil"}), 409
 
+    # PATCH: log permanent HWID (resiste a la suppression Supabase)
+    try:
+        hwid_log = supabase.table("license_keys").select("key_value") \
+            .eq("product", "trial_hwid_log").eq("desktop_hwid", hwid).limit(1).execute()
+        if hwid_log.data:
+            return jsonify({"ok": False, "error": "Essai deja utilise sur cet appareil"}), 409
+        email_log = supabase.table("license_keys").select("key_value") \
+            .eq("product", "trial_hwid_log").eq("activated_by_email", email).limit(1).execute()
+        if email_log.data:
+            return jsonify({"ok": False, "error": "Essai deja utilise avec cet email"}), 409
+    except Exception as _log_err:
+        print(f"[TRIAL] Erreur lecture trial_hwid_log: {_log_err}", flush=True)
+
     expiration_ts = int(time.time()) + (TRIAL_WINDOW_HOURS * 3600)
     rand = uuid.uuid4().hex[:4].upper()
     sig = _trial_signature(expiration_ts, rand, "desktop")
@@ -1697,6 +1710,21 @@ def activate_desktop_trial_license():
         }, on_conflict="key_value").execute()
     except Exception as e:
         return jsonify({"ok": False, "error": f"Erreur DB: {e}"}), 500
+
+    # PATCH: log permanent HWID pour bloquer futurs trials meme apres suppression
+    try:
+        log_key = f"TRIAL-LOG-{hwid[:16]}-{_stable_hash(f'{email}:{hwid}')[:12].upper()}"
+        supabase.table("license_keys").upsert({
+            "key_value": log_key,
+            "product": "trial_hwid_log",
+            "is_activated": True,
+            "activated_by_email": email,
+            "desktop_hwid": hwid,
+            "expiration": "permanent",
+            "activated_at": datetime.utcnow().isoformat(),
+        }, on_conflict="key_value").execute()
+    except Exception as _log_e:
+        print(f"[TRIAL] Erreur ecriture trial_hwid_log: {_log_e}", flush=True)
 
     return jsonify({
         "ok": True,
