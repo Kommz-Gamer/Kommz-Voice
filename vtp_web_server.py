@@ -110,7 +110,7 @@ def _derive_modal_endpoint(base_url: str, target: str) -> str:
         host = (sp.netloc or "").strip()
         path = (sp.path or "").rstrip("/")
         if host.endswith(".modal.run"):
-            for suffix in ("-clone.modal.run", "-warmup.modal.run", "-health.modal.run", "-generate.modal.run", "-tts.modal.run"):
+            for suffix in ("-clone.modal.run", "-warmup.modal.run", "-health.modal.run", "-generate.modal.run", "-tts.modal.run", "-transcribe.modal.run"):
                 if host.endswith(suffix):
                     host = host[: -len(suffix)] + f"-{target}.modal.run"
                     return urlunsplit((sp.scheme or "https", host, "", "", ""))
@@ -118,6 +118,8 @@ def _derive_modal_endpoint(base_url: str, target: str) -> str:
             path = path[:-6] + f"/{target}"
         elif path.endswith("/generate"):
             path = path[:-9] + f"/{target}"
+        elif path.endswith("/transcribe"):
+            path = path[:-11] + f"/{target}"
         elif path.endswith("/warmup") or path.endswith("/health") or path.endswith("/tts"):
             path = path.rsplit("/", 1)[0] + f"/{target}"
         else:
@@ -1934,22 +1936,13 @@ def transcribe_audio(file_id):
         whisper_payload_files = {"audio": (file_id, file_bytes, "audio/wav")}
         whisper_payload_data = {"model": model}
 
-        # Compat endpoints Modal:
-        # - certains dÃ©ploiements exposent POST /transcribe
-        # - d'autres exposent POST / (URL dÃ©jÃ  "fonction")
+        whisper_endpoint = _derive_modal_endpoint(MODAL_WHISPER_URL, "transcribe") or MODAL_WHISPER_URL
         whisper_response = requests.post(
-            f"{MODAL_WHISPER_URL}/transcribe",
+            whisper_endpoint,
             files=whisper_payload_files,
             data=whisper_payload_data,
-            timeout=120  # Whisper peut prendre jusqu'Ã  2 min sur large-v3
+            timeout=120
         )
-        if whisper_response.status_code == 404:
-            whisper_response = requests.post(
-                MODAL_WHISPER_URL,
-                files=whisper_payload_files,
-                data=whisper_payload_data,
-                timeout=120
-            )
 
         if not whisper_response.ok:
             return jsonify({

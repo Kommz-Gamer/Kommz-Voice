@@ -1,0 +1,28 @@
+# Empêche l'IA de scanner les environnements virtuels Python
+venv/
+.venv/
+.venv311/
+env/
+
+# Ignore les caches de compilation Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Ignore les logs (super important, tu en as plein !)
+*.log
+
+# Ignore les dossiers de build et les fichiers temporaires
+dist/
+dist_portable/
+dist_debug/
+build_jobs*/
+*.tmp
+
+# Ignore les fichiers médias lourds
+*.mp3
+*.wav
+*.png
+*.jpg
+.git/

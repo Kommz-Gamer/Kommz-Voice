@@ -1,4 +1,12 @@
-# Kommz Voice
+## Kommz Voice
+
+Kommz Voice est la brique moteur de l'écosystème Kommz.
+
+Ce repo regroupe la partie vocale et services autour de :
+- la synthèse vocale temps réel
+- les moteurs XTTS et GPT-SoVITS
+- la transcription Whisper
+- les services backend liés aux usages temps réel
 
 [Français](README.md) | [English](README.en.md)
 
@@ -7,11 +15,37 @@ Elle alimente les flux de **transcription**, **traduction** (via client) et **sy
 
 ## Ce que fait le projet
 
+<<<<<<< Updated upstream
 - XTTS pour la synthèse multilingue
 - GPT-SoVITS pour le timbre et le style vocal (Hybrid)
 - Whisper pour la transcription
 - API serveur pour l'intégration côté client
 - Routage et fallback selon la disponibilité des moteurs
+=======
+L'objectif de Kommz Voice est de proposer une base plus claire, plus modulaire et plus robuste pour alimenter l'écosystème vocal autour de Kommz.
+
+### Rôle dans l'écosystème
+- `Kommz Gamer Community` : client desktop open source
+- `Kommz Voice` : moteurs et services vocaux
+- `Discord` : communauté, support, retours
+- `Patreon` : soutien au développement et avantages liés à l'écosystème
+
+### Priorités actuelles
+- fiabilisation des moteurs vocaux
+- amélioration des fallbacks et du routage
+- meilleure structure documentaire
+- meilleure séparation entre client et brique moteur
+- amélioration du support pour les usages temps réel
+
+### Liens
+- Community : https://github.com/Kommz-Gamer/Kommz-Gamer
+- Discord : https://discord.gg/uv25d6uGKZ
+- Patreon : https://www.patreon.com/KommzInnovations
+- Site : https://kommz.fr
+
+
+## Ecosystem positioning
+>>>>>>> Stashed changes
 
 ## Rôle dans l'écosystème
 
