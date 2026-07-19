@@ -7782,6 +7782,19 @@ def monitoring_loop():
             in_ch = max(1, min(2, int(src_info.get("max_input_channels", 1))))
             out_ch = max(1, min(2, int(dst_info.get("max_output_channels", 2))))
 
+            # FIX: fallback sample rate si le device de sortie ne supporte pas le rate source
+            def _find_compatible_rate(src_id, dst_id, preferred_rate, channels_in, channels_out):
+                for candidate in [preferred_rate, 48000, 44100, 32000, 16000]:
+                    try:
+                        sd.check_output_settings(device=dst_id, samplerate=candidate, channels=channels_out, dtype="float32")
+                        sd.check_input_settings(device=src_id, samplerate=candidate, channels=channels_in, dtype="float32")
+                        return candidate
+                    except Exception:
+                        pass
+                return preferred_rate
+
+            rate = _find_compatible_rate(int(src_in), int(dst_out), rate, in_ch, out_ch)
+
             cur_tuple = (int(src_in), int(dst_out), int(rate))
             if (stream_in is None) or (stream_out is None) or (cur_tuple != last_tuple):
                 if stream_in is not None:
