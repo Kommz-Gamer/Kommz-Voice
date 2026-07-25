@@ -870,7 +870,7 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
             if (url === '/register' && String(payload.trial_mode || '0') !== '1') {
                 if (!payload.license_key || payload.license_key.trim() === '') {
                     btn.disabled=false;btn.textContent='Créer →';
-                    showToast('Erreur','Clé de licence manquante. Revenez à l'étape précédente et vérifiez votre clé VCV-.','error');
+                    showToast('Erreur',"Clé de licence manquante. Revenez à l'étape précédente et vérifiez votre clé VCV-.",'error');
                     return;
                 }
             }
