@@ -860,6 +860,8 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
         btn.disabled=true;btn.textContent='Initialisation...';
         try{
             const payload = Object.fromEntries(fd);
+            // DEBUG temporaire — à retirer après diagnostic
+            console.log('[handleAuth DEBUG]', {url, email: payload.email, license_key: payload.license_key, trial_mode: payload.trial_mode});
             let endpoint = url;
             if (url === '/register' && String(payload.trial_mode || '0') === '1') {
                 endpoint = '/trial/register';
