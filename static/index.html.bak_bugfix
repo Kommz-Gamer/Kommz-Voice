@@ -866,14 +866,6 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
                 payload.license_key = '';
                 payload.trial_fingerprint = payload.trial_fingerprint || buildTrialFingerprint();
             }
-            // fix — valider license_key non vide pour /register hors trial
-            if (url === '/register' && String(payload.trial_mode || '0') !== '1') {
-                if (!payload.license_key || payload.license_key.trim() === '') {
-                    btn.disabled=false;btn.textContent='Créer →';
-                    showToast('Erreur','Clé de licence manquante. Revenez à l'étape précédente et vérifiez votre clé VCV-.','error');
-                    return;
-                }
-            }
             const r=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
             const res=await r.json();
             if(res.success){window.location.assign('/');}else{btn.disabled=false;btn.textContent=url==='/login'?'Initialiser →':'Créer →';showToast('Erreur',res.error||'Auth échouée','error');}
@@ -1474,7 +1466,7 @@ body{background:var(--bg-void);color:var(--text);font-family:var(--font);height:
 
         /* CONTEXT MENU */
         openCtx(e,id){e.preventDefault();e.stopPropagation();this.ctxId=id;const m=document.getElementById('ctxMenu');m.style.display='block';let x=e.pageX,y=e.pageY;if(x+210>window.innerWidth)x-=200;if(y+140>window.innerHeight)y-=130;m.style.left=x+'px';m.style.top=y+'px';}
-        hideCtx(){const m=document.getElementById('ctxMenu');if(m)m.style.display='none';}
+        hideCtx(){document.getElementById('ctxMenu').style.display='none';}
         copyId(){if(this.ctxId){navigator.clipboard.writeText(this.ctxId);showToast('Copié','ID dans le presse-papier.','success');}}
         previewCtx(){const p=this.profiles.find(x=>x.id===this.ctxId);if(p)this.togglePreview(p.audio_url||'',p.id);}
         async deleteVoice(){
