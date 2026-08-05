@@ -1011,17 +1011,51 @@ def _norm_dev_name(name):
         return str(name or "").upper().strip()
 
 
-def get_device_index(target_name, as_output=False):
-    """Trouve l'ID d'un périphérique avec recherche souple FR/EN."""
+def _normalize_device_signature(name, hostapi):
+    n = _norm_dev_name(name)
+    h = _norm_dev_name(hostapi)
+    return f"{h}::{n}" if h else f"::{n}"
+
+
+def _device_runtime_payload(idx):
+    devs = sd.query_devices()
+    hostapis = sd.query_hostapis()
+    dev = devs[int(idx)]
+    hidx = int(dev.get("hostapi", -1))
+    hname = str(hostapis[hidx].get("name", "")) if 0 <= hidx < len(hostapis) else ""
+    return {
+        "index": int(idx),
+        "name": str(dev.get("name", "")),
+        "hostapi": hname,
+    }
+
+
+def _resolve_device_signature(signature, as_output=False):
+    """signature => runtime payload dict or None."""
     try:
-        t = _norm_dev_name(target_name)
-        for i, dev in enumerate(sd.query_devices()):
+        if not signature:
+            return None
+        sig = str(signature).strip()
+        if not sig:
+            return None
+        devs = sd.query_devices()
+        hostapis = sd.query_hostapis()
+        if "::" in sig:
+            host_part, name_part = sig.split("::", 1)
+            host_part = _norm_dev_name(host_part)
+            name_part = _norm_dev_name(name_part)
+        else:
+            host_part, name_part = "", _norm_dev_name(sig)
+        for i, dev in enumerate(devs):
+            if as_output and int(dev.get("max_output_channels", 0)) <= 0:
+                continue
+            if (not as_output) and int(dev.get("max_input_channels", 0)) <= 0:
+                continue
             d_name = _norm_dev_name(dev.get("name", ""))
-            if t and (t in d_name or ("CABLE" in t and ("VB-AUDIO" in d_name or "VIRTUAL" in d_name))):
-                if as_output and int(dev.get("max_output_channels", 0)) > 0:
-                    return i
-                if (not as_output) and int(dev.get("max_input_channels", 0)) > 0:
-                    return i
+            hidx = int(dev.get("hostapi", -1))
+            hname = _norm_dev_name(hostapis[hidx].get("name", "")) if 0 <= hidx < len(hostapis) else ""
+            if name_part and name_part in d_name and (not host_part or host_part == hname):
+                return _device_runtime_payload(i)
         return None
     except Exception:
         return None
@@ -4462,10 +4496,16 @@ def save_audio_api():
     try:
         # On ne convertit que si la clé existe et n'est pas vide
         if data.get('game_output_index') is not None and str(data['game_output_index']).isdigit():
-            AUDIO_CONFIG["game_output_device"] = int(data['game_output_index'])
-            
+            AUDIO_CONFIG["game_output_device_key"] = str(data.get('game_output_key') or "")
+            AUDIO_CONFIG["game_output_device_runtime"] = _resolve_device_signature(
+                AUDIO_CONFIG["game_output_device_key"], as_output=True
+            ) or {}
+
         if data.get('game_input_index') is not None and str(data['game_input_index']).isdigit():
-            AUDIO_CONFIG["game_input_device"] = int(data['game_input_index'])
+            AUDIO_CONFIG["game_input_device_key"] = str(data.get('game_input_key') or "")
+            AUDIO_CONFIG["game_input_device_runtime"] = _resolve_device_signature(
+                AUDIO_CONFIG["game_input_device_key"], as_output=False
+            ) or {}
 
         if data.get('tts_volume') is not None:
             try:
@@ -4498,8 +4538,8 @@ def save_audio_api():
         
         stealth_print(
             f"✅ RÉGLAGES AUDIO VALIDÉS : "
-            f"Sortie={AUDIO_CONFIG['game_output_device']}, "
-            f"Entrée={AUDIO_CONFIG['game_input_device']}, "
+            f"Sortie={AUDIO_CONFIG['game_output_device_key']}, "
+            f"Entrée={AUDIO_CONFIG['game_input_device_key']}, "
             f"Volume TTS={int(float(AUDIO_CONFIG.get('tts_volume', 1.0) or 1.0) * 100)}%"
         )
         return jsonify({"ok": True})
@@ -7722,6 +7762,7 @@ def monitoring_loop():
     stream_in = None
     stream_out = None
     last_tuple = (None, None, None)
+    _resampler = None  # soxr.ResampleStream — état persistant entre blocs
 
     while True:
         enabled = bool(AUDIO_CONFIG.get("monitoring_enabled", False))
@@ -7753,23 +7794,7 @@ def monitoring_loop():
                 continue
 
             cable_out = find_cable_output_device()
-            dst_out = None
-            preferred_out = resolve_output_device_cfg(AUDIO_CONFIG.get("game_output_device", 0))
-            if preferred_out is not None:
-                try:
-                    preferred_out = int(preferred_out)
-                    excluded = {int(x) for x in [cable_out, src_in] if x is not None}
-                    if preferred_out not in excluded:
-                        dst_out = preferred_out
-                except Exception:
-                    dst_out = None
-            if dst_out is None:
-                monitor_targets = get_monitor_output_device_ids(exclude_ids=[cable_out, src_in], max_devices=1)
-                dst_out = int(monitor_targets[0]) if monitor_targets else None
-            if dst_out is None:
-                dflt = get_default_output_device_id()
-                if dflt is not None and int(dflt) != int(cable_out):
-                    dst_out = int(dflt)
+            dst_out = AUDIO_CONFIG.get("output_device") or get_default_output_device_id()
             if dst_out is None:
                 time.sleep(0.8)
                 continue
@@ -7782,59 +7807,104 @@ def monitoring_loop():
             in_ch = max(1, min(2, int(src_info.get("max_input_channels", 1))))
             out_ch = max(1, min(2, int(dst_info.get("max_output_channels", 2))))
 
-            # FIX: fallback sample rate si le device de sortie ne supporte pas le rate source
-            # FIX monitoring direct open
-            def _find_compatible_rate(s,d,pr,ci,co):
+            # BUG1 fix — rates séparés pour InputStream (CABLE) et OutputStream (casque)
+            # _find_compatible_rate testait uniquement le device de sortie → rate 192000Hz
+            # appliqué au CABLE qui ne supporte que 48000Hz → PaErrorCode -9997
+            def _find_compatible_in_rate(device, preferred, channels):
                 import sounddevice as _sd
-                for c in [pr,48000,44100,32000,16000]:
+                for c in [preferred, 48000, 44100, 32000, 16000]:
                     try:
-                        t=_sd.OutputStream(device=d,samplerate=c,channels=co,blocksize=512,dtype="float32"); t.start(); t.stop(); t.close(); return c
-                    except: pass
-                return pr
-            rate = _find_compatible_rate(int(src_in), int(dst_out), rate, in_ch, out_ch)
-
-            cur_tuple = (int(src_in), int(dst_out), int(rate))
-            if (stream_in is None) or (stream_out is None) or (cur_tuple != last_tuple):
-                if stream_in is not None:
-                    try:
-                        stream_in.stop()
-                        stream_in.close()
+                        t = _sd.InputStream(device=device, samplerate=c, channels=channels, blocksize=512, dtype="float32")
+                        t.start(); t.stop(); t.close()
+                        return c
                     except Exception:
                         pass
-                if stream_out is not None:
+                return preferred
+
+            def _find_compatible_out_rate(device, preferred, channels):
+                import sounddevice as _sd
+                # Tester rate_in en premier → si accepté, pas de resampling du tout
+                # puis preferred (natif), puis fallbacks
+                for c in [rate_in, preferred, 48000, 44100, 32000, 16000]:
                     try:
-                        stream_out.stop()
-                        stream_out.close()
+                        t = _sd.OutputStream(device=device, samplerate=c, channels=channels, blocksize=512, dtype="float32")
+                        t.start(); t.stop(); t.close()
+                        return c
+                    except Exception:
+                        pass
+                return preferred
+
+            rate_in  = _find_compatible_in_rate(int(src_in),  int(float(src_info.get("default_samplerate", 48000) or 48000)), in_ch)
+            rate_out = _find_compatible_out_rate(int(dst_out), int(float(dst_info.get("default_samplerate", 48000) or 48000)), out_ch)
+
+            cur_tuple = (int(src_in), int(dst_out), int(rate_in), int(rate_out))
+            if (stream_in is None) or (stream_out is None) or (cur_tuple != last_tuple):
+                # Fermer les anciens streams
+                for s in set([stream_in, stream_out]):
+                    if s is not None:
+                        try: s.stop(); s.close()
+                        except Exception: pass
+                stream_in = None; stream_out = None
+
+                # OutputStream ouvert séparément (devices différents → pas de duplex)
+                stream_out = sd.OutputStream(
+                    device=int(dst_out),
+                    samplerate=rate_out,
+                    channels=out_ch,
+                    blocksize=1024,
+                    dtype="float32",
+                    latency='low',
+                )
+                stream_out.start()
+
+                # ResampleStream soxr si nécessaire
+                _rs = None
+                if rate_in != rate_out:
+                    try:
+                        import soxr as _sx
+                        _rs = _sx.ResampleStream(rate_in, rate_out, in_ch, quality="VHQ", dtype="float32")
+                    except Exception:
+                        pass
+                _resampler = _rs
+                _stream_out_ref = stream_out
+
+                # Callback InputStream — s'exécute dans le thread C PortAudio
+                def _in_cb(indata, frames, time_info, status):
+                    try:
+                        src = indata.copy()
+                        if _rs is not None:
+                            src = _rs.resample_chunk(src, last=False).astype(np.float32)
+                            if src.ndim == 1:
+                                src = src[:, np.newaxis]
+                        # Adapter les canaux
+                        if src.shape[1] == 1 and out_ch >= 2:
+                            payload = np.column_stack([src[:, 0], src[:, 0]])
+                        elif src.shape[1] >= 2 and out_ch == 1:
+                            payload = src[:, :2].mean(axis=1, keepdims=True)
+                        else:
+                            payload = src[:, :out_ch]
+                        _stream_out_ref.write(payload.astype(np.float32))
                     except Exception:
                         pass
 
                 stream_in = sd.InputStream(
                     device=int(src_in),
-                    samplerate=rate,
+                    samplerate=rate_in,
                     channels=in_ch,
                     blocksize=1024,
                     dtype="float32",
-                )
-                stream_out = sd.OutputStream(
-                    device=int(dst_out),
-                    samplerate=rate,
-                    channels=out_ch,
-                    blocksize=1024,
-                    dtype="float32",
+                    latency='low',
+                    callback=_in_cb,
                 )
                 stream_in.start()
-                stream_out.start()
                 last_tuple = cur_tuple
-                stealth_print(f"🎧 Monitoring stream: CABLE[{src_in}] -> CASQUE[{dst_out}] @ {rate}Hz")
+                stealth_print(f"🎧 Monitoring stream: CABLE[{src_in}] -> CASQUE[{dst_out}] @ SRC:{rate_in}Hz DST:{rate_out}Hz")
 
-            data, _ = stream_in.read(1024)
-            if in_ch == 1 and out_ch >= 2:
-                payload = np.column_stack((data[:, 0], data[:, 0]))
-            elif in_ch >= 2 and out_ch == 1:
-                payload = data[:, :2].mean(axis=1, keepdims=True)
-            else:
-                payload = data[:, :out_ch]
-            stream_out.write(payload)
+            # Callback actif — juste surveiller que les streams sont vivants
+            if not stream_in.active or not stream_out.active:
+                stream_in = None; stream_out = None
+                continue
+            time.sleep(0.05)
 
         except Exception as e:
             stealth_print(f"⚠️ Monitoring loop error: {e}")
@@ -8140,7 +8210,11 @@ def hybrid_activation_loop():
                 tid = resolve_input_device_cfg(sd.default.device[0])
             if tid is None:
                 raise RuntimeError("Aucun micro valide pour Hybrid.")
-            AUDIO_CONFIG["game_input_device"] = int(tid)
+            AUDIO_CONFIG["game_input_device_key"] = _normalize_device_signature(
+                sd.query_devices()[int(tid)].get("name", ""),
+                str(sd.query_hostapis()[int(sd.query_devices()[int(tid)].get("hostapi", -1))].get("name", "")) if int(sd.query_devices()[int(tid)].get("hostapi", -1)) >= 0 else ""
+            )
+            AUDIO_CONFIG["game_input_device_runtime"] = _device_runtime_payload(tid)
             info = sd.query_devices(tid)
             rate = int(info['default_samplerate'])
             
@@ -8324,7 +8398,47 @@ def get_physical_output_candidates(exclude_ids=None):
             except Exception:
                 pass
 
+        # Récupérer le NOM du device de sortie par défaut Windows via pycaw (Core Audio API).
+        # sd.default.device est mis en cache par PortAudio au démarrage et ne suit PAS
+        # un changement de périphérique par défaut fait dans Windows en live (Panneau son) —
+        # pycaw interroge Windows directement à chaque appel, donc toujours à jour.
+        _dflt_out_name = None
+        try:
+            from pycaw.pycaw import AudioUtilities
+            _dflt_dev_id = AudioUtilities.GetSpeakers().GetId()
+            for _d in AudioUtilities.GetAllDevices():
+                if _d.id == _dflt_dev_id:
+                    _dflt_out_name = _norm_dev_name(_d.FriendlyName)
+                    break
+        except Exception:
+            _dflt_out_name = None
+
+        # Trouver l'index PortAudio correspondant à ce nom (fallback sur sd.default.device si échec)
+        _dflt_out_idx = -1
         devs = sd.query_devices()
+        if _dflt_out_name:
+            for i, dev in enumerate(devs):
+                if int(dev.get("max_output_channels", 0)) <= 0:
+                    continue
+                if _norm_dev_name(dev.get("name", "")) == _dflt_out_name:
+                    _dflt_out_idx = i
+                    break
+        if _dflt_out_idx < 0:
+            try:
+                _dflt = sd.default.device
+                for _getter in [
+                    lambda d: int(d[1]),
+                    lambda d: int(d.output),
+                    lambda d: int(list(d)[1]),
+                ]:
+                    try:
+                        _dflt_out_idx = _getter(_dflt)
+                        if _dflt_out_idx >= 0:
+                            break
+                    except Exception:
+                        continue
+            except Exception:
+                _dflt_out_idx = -1
         hostapis = sd.query_hostapis()
         scored = []
         for i, dev in enumerate(devs):
@@ -8337,6 +8451,9 @@ def get_physical_output_candidates(exclude_ids=None):
                 continue
 
             score = 0
+            # Priorité absolue au device par défaut Windows (+200)
+            if _dflt_out_idx >= 0 and i == _dflt_out_idx:
+                score += 200
             if any(x in n for x in ["HEADSET", "CASQUE", "SPEAKERS", "HAUT-PARLEUR"]):
                 score += 50
             if any(x in n for x in ["REALTEK", "USB", "AUDIO"]):
@@ -8414,10 +8531,9 @@ def get_default_output_device_id():
                 return None
             # sounddevice >=0.5 peut exposer un _InputOutputPair
             # (itérable mais non tuple/list) avec attributs input/output.
-            if hasattr(v, "__getitem__") and hasattr(v, "__len__"):
+            if hasattr(v, "__getitem__"):
                 try:
-                    if len(v) >= 2:
-                        return int(v[1])
+                    return int(v[1])
                 except Exception:
                     pass
             if hasattr(v, "output"):
@@ -8531,25 +8647,10 @@ def resample_and_play(audio_gen, text_to_show="", speaker_name="MOI", source_hz=
             cid = resolve_output_device_cfg(AUDIO_CONFIG.get("game_output_device", 0))
         if cid is not None:
             target_ids.append(int(cid))
-        # F3: on ajoute aussi un retour physique direct.
-        # Cela évite le silence si le miroir monitoring_loop rate un device CABLE.
+        # F3 actif : monitoring_loop relaie déjà CABLE→casque
+        # Ne pas ajouter les devices physiques — conflit de streams → silence
         if AUDIO_CONFIG.get("monitoring_enabled", False):
-            for did in get_monitor_output_device_ids(exclude_ids=[cid], max_devices=2):
-                _append_valid_output_device(did)
-            # Filet de sécurité: si on n'a que le CABLE, ajoute d'autres sorties.
-            if len(list(dict.fromkeys(target_ids))) <= 1:
-                try:
-                    devs = sd.query_devices()
-                    for i, d in enumerate(devs):
-                        if int(d.get("max_output_channels", 0)) <= 0:
-                            continue
-                        if cid is not None and int(i) == int(cid):
-                            continue
-                        _append_valid_output_device(int(i))
-                        if len(list(dict.fromkeys(target_ids))) >= 3:
-                            break
-                except Exception:
-                    pass
+            pass  # monitoring_loop gère le relai, TTS → CABLE suffit
     else:
         # ALLY TTS désactivé: pas d'erreur, on quitte silencieusement.
         if not AUDIO_CONFIG.get("tts_active", True):
@@ -8614,16 +8715,6 @@ def resample_and_play(audio_gen, text_to_show="", speaker_name="MOI", source_hz=
         if not all_data:
             return
 
-        acquired = PLAYBACK_LOCK.acquire(timeout=8 if _is_turbo_mode_active() else 20)
-        if not acquired:
-            stealth_print("⚠️ Playback occupé, audio ignoré.")
-            if _is_turbo_mode_active():
-                _set_module_runtime("turbo", "Saturation", "Lecture occupée, ancienne file ignorée pour garder la réactivité")
-            return
-        _is_speaking = True
-        if _is_turbo_mode_active():
-            _set_module_runtime("turbo", "Lecture", "Sortie audio priorisée")
-
         # Détection du format WAV
         if all_data.startswith(b'RIFF'):
             # C'est un fichier WAV, on extrait les données PCM
@@ -8674,26 +8765,90 @@ def resample_and_play(audio_gen, text_to_show="", speaker_name="MOI", source_hz=
         audio_48k = np.tanh(audio_48k * limiter_drive) / np.tanh(limiter_drive)
         audio_48k = np.clip(audio_48k, -1.0, 1.0)
 
-        # Jouer l'audio sur les devices ciblés (CABLE + monitoring éventuel)
-        for did in list(dict.fromkeys(target_ids)):
+        # File FIFO par flux (MOI / ALLIÉ) — remplace l'ancien lock à timeout 8s
+        # qui abandonnait silencieusement une phrase si la précédente durait plus longtemps.
+        # Ici : chaque phrase attend son tour et est TOUJOURS jouée, dans l'ordre d'arrivée.
+        queue_name = "MOI" if is_me else "ALLIÉ"
+        _ensure_playback_worker(queue_name)
+        try:
+            _playback_queues[queue_name].put(
+                (list(dict.fromkeys(target_ids)), audio_48k, speaker_name),
+                timeout=30,
+            )
+        except queue.Full:
+            stealth_print(f"⚠️ File playback {queue_name} saturée (>6 phrases en attente), audio ignoré.")
+
+    except Exception as e:
+        stealth_print(f"⚠️ Erreur Stream : {e}")
+
+
+# File d'attente FIFO de lecture — une par flux (MOI/ALLIÉ), pour ne jamais perdre
+# de phrase même si la synthèse va plus vite que la lecture audio.
+_playback_queues = {"MOI": queue.Queue(maxsize=6), "ALLIÉ": queue.Queue(maxsize=6)}
+_playback_workers_started = {}
+_playback_workers_lock = threading.Lock()
+
+
+def _ensure_playback_worker(queue_name):
+    with _playback_workers_lock:
+        if not _playback_workers_started.get(queue_name):
+            t = threading.Thread(target=_playback_worker, args=(queue_name,), daemon=True, name=f"PlaybackWorker-{queue_name}")
+            t.start()
+            _playback_workers_started[queue_name] = True
+
+
+def _playback_worker(queue_name):
+    q = _playback_queues[queue_name]
+    while True:
+        item = q.get()
+        if item is None:
+            continue
+        target_ids, audio_48k, speaker_name = item
+        _do_playback(target_ids, audio_48k, speaker_name)
+
+
+def _do_playback(target_ids, audio_48k, speaker_name):
+    global _is_speaking
+    _is_speaking = True
+    if _is_turbo_mode_active():
+        _set_module_runtime("turbo", "Lecture", "Sortie audio priorisée")
+    try:
+        for did in target_ids:
             try:
                 if did is None:
                     sd.play(audio_48k, samplerate=48000)
+                    sd.wait()
                 else:
-                    sd.play(audio_48k, samplerate=48000, device=int(did))
-                sd.wait()
+                    # BUG 2 fix — valider que le device existe avant d'ouvrir le stream
+                    try:
+                        dev_info = sd.query_devices(int(did))
+                        if int(dev_info.get("max_output_channels", 0)) <= 0:
+                            stealth_print(f"⚠️ Device [{did}] sans canaux de sortie, ignoré.")
+                            continue
+                        dev_sr = int(float(dev_info.get("default_samplerate", 48000) or 48000))
+                    except Exception as dev_err:
+                        stealth_print(f"⚠️ Device [{did}] invalide ({dev_err}), ignoré.")
+                        continue
+                    # BUG B fix — rééchantillonner pour matcher le device de sortie
+                    if dev_sr != 48000 and dev_sr > 0:
+                        audio_dev = resample_audio(audio_48k, sr_from=48000, sr_to=dev_sr)
+                    else:
+                        audio_dev = audio_48k
+                    sd.play(audio_dev, samplerate=dev_sr, device=int(did))
+                    sd.wait()
             except Exception as e:
                 dev_label = "DEFAULT" if did is None else str(did)
-                stealth_print(f"⚠️ Lecture échouée sur device [{dev_label}]: {e}")
-
+                err_str = str(e)
+                # -9996 = paDeviceUnavailable (device occupé/exclusif) → skip silencieux
+                if "-9996" in err_str or "unavailable" in err_str.lower():
+                    stealth_print(f"ℹ️ Device [{dev_label}] occupé (skip): {e}")
+                else:
+                    stealth_print(f"⚠️ Lecture échouée sur device [{dev_label}]: {e}")
         stealth_print("🔊 Lecture terminée")
-
     except Exception as e:
         stealth_print(f"⚠️ Erreur Stream : {e}")
     finally:
         _is_speaking = False
-        if PLAYBACK_LOCK.locked():
-            PLAYBACK_LOCK.release()
 
 # ==================== MOTEUR DE CAPTURE PTT ====================
 
@@ -8773,7 +8928,11 @@ def start_rec():
     if target_mic_id is None:
         stealth_print("❌ Aucun micro d'entrée valide détecté.")
         return
-    AUDIO_CONFIG["game_input_device"] = int(target_mic_id)
+    AUDIO_CONFIG["game_input_device_key"] = _normalize_device_signature(
+        sd.query_devices()[int(target_mic_id)].get("name", ""),
+        str(sd.query_hostapis()[int(sd.query_devices()[int(target_mic_id)].get("hostapi", -1))].get("name", "")) if int(sd.query_devices()[int(target_mic_id)].get("hostapi", -1)) >= 0 else ""
+    )
+    AUDIO_CONFIG["game_input_device_runtime"] = _device_runtime_payload(target_mic_id)
 
     with _ptt_lock:
         if _ptt_rec: return 
@@ -10227,13 +10386,13 @@ def select_microphone_at_startup():
     stealth_print("="*50)
 
     # Priorité: micro sauvegardé dans la configuration utilisateur.
-    saved_mic = resolve_input_device_cfg(AUDIO_CONFIG.get("game_input_device"))
+    saved_mic_sig = AUDIO_CONFIG.get("game_input_device_key") or AUDIO_CONFIG.get("game_input_device")
+    saved_mic = _resolve_device_signature(saved_mic_sig, as_output=False)
     if saved_mic is not None:
         try:
-            devices = sd.query_devices()
-            SELECTED_MIC_ID = int(saved_mic)
-            SELECTED_MIC_NAME = devices[SELECTED_MIC_ID]["name"]
-            AUDIO_CONFIG["game_input_device"] = int(SELECTED_MIC_ID)
+            SELECTED_MIC_ID = int(saved_mic["index"])
+            SELECTED_MIC_NAME = saved_mic["name"]
+            AUDIO_CONFIG["game_input_device_runtime"] = saved_mic
             stealth_print(f"🎯 CIBLE UTILISÉE : {SELECTED_MIC_NAME} (ID {SELECTED_MIC_ID}) [config]")
             stealth_print("="*50 + "\n")
             return
@@ -10261,7 +10420,7 @@ def select_microphone_at_startup():
                 break
 
     # Synchronise la configuration avec le micro résolu.
-    AUDIO_CONFIG["game_input_device"] = int(SELECTED_MIC_ID)
+    AUDIO_CONFIG["game_input_device_runtime"] = _device_runtime_payload(SELECTED_MIC_ID)
     
     stealth_print(f"🎯 CIBLE UTILISÉE : {SELECTED_MIC_NAME} (ID {SELECTED_MIC_ID})")
     stealth_print("="*50 + "\n")
@@ -10680,7 +10839,10 @@ def transcribe_safe(audio_source, sample_rate=16000):
         return "", "fr"
 
 def overlay_loop():
-    while not AUDIO_CONFIG.get("gamesense_overlay_active", False): 
+    while not (AUDIO_CONFIG.get("gamesense_overlay_active", False)
+               or AUDIO_CONFIG.get("overlay_enabled", False)
+               or AUDIO_CONFIG.get("show_own_subs_active", False)
+               or AUDIO_CONFIG.get("show_ally_subs_active", False)):
         time.sleep(1)
         
     try:
@@ -11571,8 +11733,14 @@ class JSApi:
     def save_audio_config(self, tts_name, listen_name, ptt_key):
         global AUDIO_CONFIG
         
-        AUDIO_CONFIG["game_output_device"] = tts_name
-        AUDIO_CONFIG["game_input_device"] = listen_name
+        AUDIO_CONFIG["game_output_device_key"] = _normalize_device_signature(tts_name, "")
+        AUDIO_CONFIG["game_input_device_key"] = _normalize_device_signature(listen_name, "")
+        AUDIO_CONFIG["game_output_device_runtime"] = _resolve_device_signature(
+            AUDIO_CONFIG["game_output_device_key"], as_output=True
+        ) or {}
+        AUDIO_CONFIG["game_input_device_runtime"] = _resolve_device_signature(
+            AUDIO_CONFIG["game_input_device_key"], as_output=False
+        ) or {}
         AUDIO_CONFIG["ptt_hotkey"] = ptt_key # On met à jour la touche
         
         save_settings()
@@ -12024,7 +12192,11 @@ if __name__ == "__main__":
         in_id = resolve_input_device_cfg(AUDIO_CONFIG.get("game_input_device"))
     if in_id is None:
         in_id = 0
-    AUDIO_CONFIG["game_input_device"] = int(in_id)
+    AUDIO_CONFIG["game_input_device_key"] = _normalize_device_signature(
+        sd.query_devices()[int(in_id)].get("name", ""),
+        str(sd.query_hostapis()[int(sd.query_devices()[int(in_id)].get("hostapi", -1))].get("name", "")) if int(sd.query_devices()[int(in_id)].get("hostapi", -1)) >= 0 else ""
+    )
+    AUDIO_CONFIG["game_input_device_runtime"] = _device_runtime_payload(in_id)
 
     stealth_print(f"✅ START: Micro {in_id} | Sortie Jeu {AUDIO_CONFIG.get('game_output_device')}")
 
